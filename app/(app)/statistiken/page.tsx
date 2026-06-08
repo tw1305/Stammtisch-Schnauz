@@ -36,6 +36,9 @@ export default function StatistikenPage() {
       .select('*')
       .order('start_date', { ascending: false })
     setSeasons(data || [])
+    // Default-Auswahl: aktuelle (aktive) Season
+    const active = (data || []).find(s => s.status === 'active')
+    if (active) setSelectedSeasonId(active.id)
   }
 
   async function loadStats() {
