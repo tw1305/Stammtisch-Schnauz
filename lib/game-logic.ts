@@ -60,9 +60,9 @@ export function formatBalance(amount: number): string {
 }
 
 export function getBalanceColor(amount: number): string {
-  if (amount > 0) return 'text-[#22C55E]'
-  if (amount < 0) return 'text-[#EF4444]'
-  return 'text-[#9A9A9A]'
+  if (amount > 0) return 'text-[#34D399]'
+  if (amount < 0) return 'text-[#F87171]'
+  return 'text-[#8B95A7]'
 }
 
 export function getCurrentQuarter(): string {

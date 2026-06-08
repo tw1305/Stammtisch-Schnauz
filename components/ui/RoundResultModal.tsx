@@ -23,22 +23,24 @@ export default function RoundResultModal({
   const winnerGain = winner?.balance_change ?? 0
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 p-4 pb-24">
-      <div className="w-full max-w-sm bg-[#1C1C1C] rounded-2xl border border-[#2E2E2E] overflow-hidden">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end justify-center z-50 p-4 pb-24 animate-fade-in">
+      <div className="w-full max-w-sm bg-[#141925] rounded-3xl border border-[#2A3344] overflow-hidden shadow-2xl animate-pop-in">
         {/* Header */}
-        <div className="bg-[#242424] px-5 py-5 text-center border-b border-[#2E2E2E]">
-          <div className="text-3xl mb-1">🏆</div>
-          <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#F5F5F5]">
+        <div className="px-5 py-6 text-center border-b border-[#2A3344] relative overflow-hidden"
+          style={{ background: 'linear-gradient(160deg, rgba(99,102,241,0.22), rgba(27,34,48,0.4))' }}
+        >
+          <div className="text-4xl mb-1.5">🏆</div>
+          <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#F1F5F9]">
             {winnerName} gewinnt!
           </h2>
-          <p className="text-[#22C55E] font-semibold text-lg mt-0.5">
+          <p className="text-[#34D399] font-bold text-lg mt-1">
             {formatBalance(winnerGain)} in dieser Runde
           </p>
         </div>
 
         {/* Session Standings */}
         <div className="px-5 py-4">
-          <p className="text-[#9A9A9A] text-xs uppercase tracking-wider mb-3 font-medium">
+          <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">
             Session-Stand
           </p>
           <div className="space-y-2">
@@ -51,7 +53,7 @@ export default function RoundResultModal({
                     key={rp.player_id}
                     className="flex items-center justify-between"
                   >
-                    <span className="text-[#F5F5F5] text-sm">
+                    <span className="text-[#F1F5F9] text-sm">
                       {rp.player?.name ?? ''}
                       {rp.player_id === winnerId && ' 👑'}
                     </span>
@@ -68,13 +70,13 @@ export default function RoundResultModal({
         <div className="px-5 pb-5 space-y-2">
           <button
             onClick={onNewRound}
-            className="w-full bg-[#D62839] hover:bg-[#E8364A] text-[#111111] font-semibold rounded-xl py-3 transition-colors"
+            className="w-full bg-[#6366F1] hover:bg-[#818CF8] text-white font-semibold rounded-xl py-3 transition-colors"
           >
             ▶ Neue Runde
           </button>
           <button
             onClick={onManagePlayers}
-            className="w-full bg-[#242424] hover:bg-[#2E2E2E] text-[#F5F5F5] font-medium rounded-xl py-3 transition-colors"
+            className="w-full bg-[#1B2230] hover:bg-[#2A3344] text-[#F1F5F9] font-medium rounded-xl py-3 transition-colors"
           >
             👥 Spielerverwaltung
           </button>

@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-primary: #111111;
-  --color-bg-surface: #1C1C1C;
-  --color-bg-card: #242424;
-  --color-border: #2E2E2E;
-  --color-gold: #D62839;
-  --color-gold-hover: #E8364A;
-  --color-text-primary: #F5F5F5;
-  --color-text-secondary: #9A9A9A;
-  --color-positive: #22C55E;
-  --color-negative: #EF4444;
-  --font-display: "Playfair Display", serif;
-  --font-body: "DM Sans", sans-serif;
+  --color-bg-primary: #0B0E14;
+  --color-bg-surface: #141925;
+  --color-bg-card: #1B2230;
+  --color-border: #2A3344;
+  --color-accent: #6366F1;
+  --color-accent-hover: #818CF8;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #8B95A7;
+  --color-positive: #34D399;
+  --color-negative: #F87171;
+  --font-display: "Sora", sans-serif;
+  --font-body: "Inter", sans-serif;
 }
 
 * {
@@ -20,19 +20,38 @@
 }
 
 html {
-  background-color: #111111;
-  color: #F5F5F5;
+  background-color: #0B0E14;
+  color: #F1F5F9;
 }
 
 body {
-  font-family: "DM Sans", sans-serif;
-  background-color: #111111;
-  color: #F5F5F5;
+  font-family: "Inter", sans-serif;
+  background-color: #0B0E14;
+  background-image: radial-gradient(1100px 560px at 50% -8%, #19203150 0%, rgba(11, 14, 20, 0) 60%);
+  background-attachment: fixed;
+  color: #F1F5F9;
   min-height: 100dvh;
   overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Safe area for bottom nav on iOS */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: translateY(16px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-pop-in {
+  animation: pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
 }

@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from 'next'
-import { Playfair_Display, DM_Sans } from 'next/font/google'
+import { Sora, Inter } from 'next/font/google'
 import './globals.css'
 
-const playfair = Playfair_Display({
+const sora = Sora({
   subsets: ['latin'],
   variable: '--font-display',
+  weight: ['500', '600', '700', '800'],
   display: 'swap',
 })
 
-const dmSans = DM_Sans({
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-body',
   display: 'swap',
@@ -30,7 +31,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#111111',
+  themeColor: '#0B0E14',
 }
 
 export default function RootLayout({
@@ -39,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="de" className={`${playfair.variable} ${dmSans.variable}`}>
+    <html lang="de" className={`${sora.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   )

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
 import GameTable from '@/components/ui/GameTable'
 import RoundResultModal from '@/components/ui/RoundResultModal'
+import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import type { Season, Player } from '@/types/database'
 
 const STAKE_OPTIONS = [
@@ -14,6 +15,8 @@ const STAKE_OPTIONS = [
   { label: 'Triple', multiplier: 3 },
   { label: 'Quattro', multiplier: 4 },
 ]
+
+const DEFAULT_PLAYERS = ['Domi', 'Tom', 'André']
 
 export default function SpielPage() {
   const router = useRouter()
@@ -43,6 +46,7 @@ export default function SpielPage() {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [showPlayerManager, setShowPlayerManager] = useState(false)
   const [sessionBalances, setSessionBalances] = useState<Record<string, number>>({})
+  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadMeta()
@@ -66,6 +70,10 @@ export default function SpielPage() {
       .eq('is_active', true)
       .order('name')
     setAllPlayers(players || [])
+
+    // Default selection: Domi, Tom, André (if they exist)
+    const defaults = (players || []).filter(p => DEFAULT_PLAYERS.includes(p.name)).map(p => p.id)
+    setPickedIds(new Set(defaults))
 
     const saved = localStorage.getItem('schnauz_default_stake')
     if (saved) setDefaultStake(parseInt(saved))
@@ -103,9 +111,18 @@ export default function SpielPage() {
     ? parseInt(customStake) || defaultStake
     : defaultStake * selectedMultiplier
 
+  function togglePick(id: string) {
+    setPickedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else if (next.size < 9) next.add(id)
+      return next
+    })
+  }
+
   async function handleStartSession() {
-    if (!activeSeason || allPlayers.length < 2) return
-    await startSession(activeSeason.id, allPlayers.slice(0, 9).map(p => p.id))
+    if (!activeSeason || pickedIds.size < 2) return
+    await startSession(activeSeason.id, [...pickedIds])
   }
 
   async function handleStartRound() {
@@ -127,42 +144,69 @@ export default function SpielPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
-        <div className="text-[#9A9A9A]">Laden...</div>
+        <div className="text-[#8B95A7]">Laden...</div>
       </div>
     )
   }
 
-  // No active session
+  // No active session → player picker
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 gap-6">
-        <div className="text-center">
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#D62839] mb-2">
-            Schnauz
+      <div className="flex flex-col max-w-md mx-auto w-full min-h-[85vh] px-4 pt-8 pb-6">
+        <div className="text-center mb-8">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold text-[#F1F5F9] tracking-tight">
+            Stammtisch <span className="text-[#6366F1]">Schnauz</span>
           </h1>
           {activeSeason ? (
-            <p className="text-[#9A9A9A]">{activeSeason.name}</p>
+            <p className="text-[#8B95A7] mt-1">{activeSeason.name}</p>
           ) : (
-            <p className="text-[#EF4444] text-sm">Keine aktive Season — bitte zuerst eine Season anlegen.</p>
+            <p className="text-[#F87171] text-sm mt-2">Keine aktive Season — lege zuerst eine an.</p>
           )}
         </div>
 
         {activeSeason && (
-          <button
-            onClick={handleStartSession}
-            disabled={allPlayers.length < 2}
-            className="bg-[#D62839] hover:bg-[#E8364A] disabled:opacity-50 text-[#111111] font-semibold rounded-xl px-8 py-4 text-lg transition-colors"
-          >
-            ▶ Neue Session starten
-          </button>
+          <>
+            <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">
+              Wer spielt mit? ({pickedIds.size})
+            </p>
+            <div className="grid grid-cols-3 gap-2.5 flex-1 content-start">
+              {allPlayers.map(p => {
+                const picked = pickedIds.has(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => togglePick(p.id)}
+                    className={`flex flex-col items-center gap-2 rounded-2xl py-4 border transition-all ${
+                      picked
+                        ? 'border-[#6366F1] bg-[#6366F1]/10'
+                        : 'border-[#2A3344] bg-[#141925] opacity-60'
+                    }`}
+                  >
+                    <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={56} />
+                    <span className="text-[#F1F5F9] text-xs font-medium truncate max-w-[80px]">{p.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              onClick={handleStartSession}
+              disabled={pickedIds.size < 2}
+              className="mt-6 w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-40 text-white font-semibold rounded-2xl py-4 text-base transition-colors"
+            >
+              ▶ Session starten
+            </button>
+          </>
         )}
 
-        <button
-          onClick={() => router.push('/seasons')}
-          className="text-[#9A9A9A] text-sm underline"
-        >
-          Seasons verwalten
-        </button>
+        {!activeSeason && (
+          <button
+            onClick={() => router.push('/seasons')}
+            className="mt-6 w-full bg-[#6366F1] text-white font-semibold rounded-2xl py-4 transition-colors"
+          >
+            Zu den Seasons
+          </button>
+        )}
       </div>
     )
   }
@@ -170,22 +214,25 @@ export default function SpielPage() {
   // Active round
   if (activeRound) {
     return (
-      <div className="flex flex-col min-h-[80vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <div>
-            <span className="text-[#F5F5F5] font-semibold">Runde #{activeRound.round_number}</span>
-            <span className="text-[#9A9A9A] text-sm ml-2">· {activeRound.stake} €</span>
+      <div className="flex flex-col min-h-[85vh] max-w-md mx-auto w-full">
+        <div className="flex items-center justify-between px-4 pt-5 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="font-[family-name:var(--font-display)] text-[#F1F5F9] font-bold text-lg">
+              Runde {activeRound.round_number}
+            </span>
+            <span className="text-[#6366F1] text-sm font-semibold bg-[#6366F1]/10 px-2 py-0.5 rounded-full">
+              {activeRound.stake} €
+            </span>
           </div>
           <button
             onClick={() => router.push('/einstellungen')}
-            className="text-[#9A9A9A] text-xl p-2"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#1B2230] text-[#8B95A7] text-lg transition-colors"
           >
             ⚙
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-2">
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
           <GameTable
             sessionPlayers={sessionPlayers}
             roundPlayers={roundPlayers}
@@ -194,31 +241,31 @@ export default function SpielPage() {
           />
         </div>
 
-        <div className="px-4 pb-4 text-center text-[#9A9A9A] text-sm">
+        <div className="px-4 pb-4 text-center text-[#8B95A7] text-sm">
           💡 Spieler antippen zum Ausscheiden / Wiederbeleben
         </div>
       </div>
     )
   }
 
-  // Between rounds (or start of session)
+  // Between rounds
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col max-w-md mx-auto w-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div>
-          <span className="text-[#F5F5F5] font-semibold">{activeSeason?.name ?? 'Session'}</span>
-        </div>
+      <div className="flex items-center justify-between px-4 pt-5 pb-2">
+        <span className="font-[family-name:var(--font-display)] text-[#F1F5F9] font-bold text-lg">
+          {activeSeason?.name ?? 'Session'}
+        </span>
         <button
           onClick={() => router.push('/einstellungen')}
-          className="text-[#9A9A9A] text-xl p-2"
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#1B2230] text-[#8B95A7] text-lg transition-colors"
         >
           ⚙
         </button>
       </div>
 
       {/* Table */}
-      <div className="flex justify-center px-2 py-2">
+      <div className="flex justify-center px-4 py-2">
         <GameTable
           sessionPlayers={sessionPlayers}
           sessionBalances={sessionBalances}
@@ -226,19 +273,19 @@ export default function SpielPage() {
         />
       </div>
 
-      {/* Player management buttons */}
-      <div className="flex gap-2 px-4 mb-4">
+      {/* Player management */}
+      <div className="px-4 mb-4">
         <button
           onClick={() => setShowPlayerManager(true)}
-          className="flex-1 bg-[#242424] border border-[#2E2E2E] text-[#F5F5F5] rounded-xl py-2.5 text-sm font-medium"
+          className="w-full bg-[#141925] border border-[#2A3344] text-[#F1F5F9] rounded-2xl py-3 text-sm font-medium hover:border-[#6366F1]/50 transition-colors"
         >
-          + / − Spieler
+          👥 Spieler hinzufügen / entfernen
         </button>
       </div>
 
       {/* Stake selection */}
       <div className="px-4 mb-4">
-        <p className="text-[#9A9A9A] text-xs mb-2 font-medium uppercase tracking-wider">Einsatz wählen</p>
+        <p className="text-[#8B95A7] text-xs mb-2 font-medium uppercase tracking-wider">Einsatz wählen</p>
         <div className="flex gap-2 flex-wrap">
           {STAKE_OPTIONS.map(opt => {
             const amount = defaultStake * opt.multiplier
@@ -247,10 +294,10 @@ export default function SpielPage() {
               <button
                 key={opt.multiplier}
                 onClick={() => { setSelectedMultiplier(opt.multiplier); setShowCustomInput(false) }}
-                className={`flex-1 min-w-[60px] rounded-xl py-2.5 text-sm font-semibold transition-colors border
+                className={`flex-1 min-w-[60px] rounded-xl py-3 text-sm font-semibold transition-colors border
                   ${isSelected
-                    ? 'bg-[#D62839] border-[#D62839] text-[#111111]'
-                    : 'bg-[#242424] border-[#2E2E2E] text-[#F5F5F5]'
+                    ? 'bg-[#6366F1] border-[#6366F1] text-white'
+                    : 'bg-[#141925] border-[#2A3344] text-[#F1F5F9]'
                   }`}
               >
                 {amount} €
@@ -259,10 +306,10 @@ export default function SpielPage() {
           })}
           <button
             onClick={() => setShowCustomInput(true)}
-            className={`flex-1 min-w-[44px] rounded-xl py-2.5 text-sm font-semibold transition-colors border
+            className={`flex-1 min-w-[44px] rounded-xl py-3 text-sm font-semibold transition-colors border
               ${showCustomInput
-                ? 'bg-[#D62839] border-[#D62839] text-[#111111]'
-                : 'bg-[#242424] border-[#2E2E2E] text-[#9A9A9A]'
+                ? 'bg-[#6366F1] border-[#6366F1] text-white'
+                : 'bg-[#141925] border-[#2A3344] text-[#8B95A7]'
               }`}
           >
             ✏️
@@ -277,7 +324,7 @@ export default function SpielPage() {
             value={customStake}
             onChange={e => setCustomStake(e.target.value)}
             placeholder="Eigener Einsatz (€)"
-            className="mt-2 w-full bg-[#1C1C1C] border border-[#D62839] rounded-xl px-4 py-2.5 text-[#F5F5F5] outline-none text-sm"
+            className="mt-2 w-full bg-[#141925] border border-[#6366F1] rounded-xl px-4 py-3 text-[#F1F5F9] outline-none text-sm"
             autoFocus
           />
         )}
@@ -288,19 +335,18 @@ export default function SpielPage() {
         <button
           onClick={handleStartRound}
           disabled={sessionPlayers.length < 2}
-          className="w-full bg-[#D62839] hover:bg-[#E8364A] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-4 text-base transition-colors"
+          className="w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-2xl py-4 text-base transition-colors"
         >
-          ▶ Neue Runde starten ({effectiveStake} €)
+          ▶ Neue Runde starten · {effectiveStake} €
         </button>
         <button
           onClick={handleEndSession}
-          className="w-full bg-[#242424] border border-[#2E2E2E] hover:bg-[#2E2E2E] text-[#9A9A9A] font-medium rounded-xl py-3 text-sm transition-colors"
+          className="w-full bg-[#141925] border border-[#2A3344] hover:bg-[#1B2230] text-[#8B95A7] font-medium rounded-2xl py-3 text-sm transition-colors"
         >
           Session beenden
         </button>
       </div>
 
-      {/* Player manager overlay */}
       {showPlayerManager && (
         <PlayerManagerOverlay
           sessionPlayers={sessionPlayers}
@@ -311,7 +357,6 @@ export default function SpielPage() {
         />
       )}
 
-      {/* Round result modal */}
       {completedRound && (
         <RoundResultModal
           winnerId={completedRound.winnerId}
@@ -345,23 +390,27 @@ function PlayerManagerOverlay({
   const canAdd = sessionPlayers.length < 9
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-end">
-      <div className="w-full bg-[#1C1C1C] rounded-t-2xl border-t border-[#2E2E2E] max-h-[70vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2E2E2E]">
-          <h2 className="font-semibold text-[#F5F5F5]">Spieler verwalten</h2>
-          <button onClick={onClose} className="text-[#9A9A9A] text-xl p-1">✕</button>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
+      <div
+        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[72vh] flex flex-col animate-pop-in"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
+          <h2 className="font-[family-name:var(--font-display)] font-bold text-[#F1F5F9]">Spieler verwalten</h2>
+          <button onClick={onClose} className="text-[#8B95A7] text-2xl leading-none w-8 h-8">×</button>
         </div>
-        <div className="overflow-y-auto flex-1 px-5 py-3 space-y-2">
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1.5">
           {allPlayers.map(p => {
             const sp = sessionPlayers.find(s => s.player_id === p.id)
             const inSession = activeIds.has(p.id)
             return (
-              <div key={p.id} className="flex items-center justify-between py-2">
-                <span className="text-[#F5F5F5]">{p.name}</span>
+              <div key={p.id} className="flex items-center gap-3 py-2 px-2">
+                <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} eliminated={!inSession} />
+                <span className="text-[#F1F5F9] flex-1">{p.name}</span>
                 {inSession ? (
                   <button
                     onClick={() => sp && onRemove(sp.id)}
-                    className="text-[#EF4444] text-sm font-medium px-3 py-1 rounded-lg bg-[#EF4444]/10"
+                    className="text-[#F87171] text-sm font-medium px-3 py-1.5 rounded-lg bg-[#F87171]/10"
                   >
                     Entfernen
                   </button>
@@ -369,7 +418,7 @@ function PlayerManagerOverlay({
                   <button
                     onClick={() => canAdd && onAdd(p.id)}
                     disabled={!canAdd}
-                    className="text-[#22C55E] text-sm font-medium px-3 py-1 rounded-lg bg-[#22C55E]/10 disabled:opacity-40"
+                    className="text-[#34D399] text-sm font-medium px-3 py-1.5 rounded-lg bg-[#34D399]/10 disabled:opacity-40"
                   >
                     Hinzufügen
                   </button>
@@ -378,8 +427,8 @@ function PlayerManagerOverlay({
             )
           })}
         </div>
-        <div className="px-5 py-4 border-t border-[#2E2E2E]">
-          <button onClick={onClose} className="w-full bg-[#D62839] text-[#111111] font-semibold rounded-xl py-3">
+        <div className="px-5 py-4 border-t border-[#2A3344]">
+          <button onClick={onClose} className="w-full bg-[#6366F1] text-white font-semibold rounded-2xl py-3">
             Fertig
           </button>
         </div>
