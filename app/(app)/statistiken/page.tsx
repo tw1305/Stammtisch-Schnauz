@@ -11,6 +11,16 @@ export default function StatistikenPage() {
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('all')
   const [stats, setStats] = useState<PlayerStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  function toggle(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     loadSeasons()
@@ -144,44 +154,59 @@ export default function StatistikenPage() {
       </div>
 
       {/* Stats */}
-      <div className="px-4 py-4 space-y-4">
+      <div className="px-4 py-4 space-y-2.5">
         {loading ? (
           <div className="text-center text-[#8B95A7] py-10">Laden...</div>
         ) : stats.length === 0 ? (
           <div className="text-center text-[#8B95A7] py-10">Noch keine Statistiken vorhanden.</div>
         ) : (
-          stats.map((s, i) => (
-            <div key={s.player.id} className="bg-[#141925] rounded-2xl border border-[#2A3344] overflow-hidden">
-              {/* Player header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#2A3344] bg-[#1B2230]">
-                <div className="w-8 h-8 rounded-full bg-[#6366F1] flex items-center justify-center text-white text-xs font-bold">
-                  {i + 1}
-                </div>
-                <span className="font-semibold text-[#F1F5F9] flex-1">{s.player.name}</span>
-                <span className={`font-bold text-lg ${getBalanceColor(s.total_balance)}`}>
-                  {formatBalance(s.total_balance)}
-                </span>
-              </div>
-
-              {/* Stats grid */}
-              <div className="grid grid-cols-3 divide-x divide-[#2A3344]">
-                <StatCell icon="🏆" label="Siege" value={s.wins} />
-                <StatCell icon="💀" label="1. Aus" value={s.first_eliminations} />
-                <StatCell icon="💉" label="Revivals" value={s.revivals} />
-              </div>
-              <div className="grid grid-cols-3 divide-x divide-[#2A3344] border-t border-[#2A3344]">
-                <StatCell icon="⚔️" label="Finals" value={s.final_appearances} />
-                <StatCell icon="🔥" label="Streak" value={s.win_streak} highlight={s.win_streak >= 3} />
-                <div className="flex flex-col items-center justify-center py-3">
-                  <span className="text-base mb-0.5">💰</span>
-                  <span className={`text-sm font-bold ${getBalanceColor(s.total_balance)}`}>
+          stats.map((s, i) => {
+            const isOpen = expanded.has(s.player.id)
+            return (
+              <div key={s.player.id} className="bg-[#141925] rounded-2xl border border-[#2A3344] overflow-hidden">
+                {/* Collapsed header — tap to expand */}
+                <button
+                  onClick={() => toggle(s.player.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
+                    isOpen ? 'bg-[#1B2230]' : 'hover:bg-[#1B2230]/60'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-[#6366F1] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {i + 1}
+                  </div>
+                  <span className="font-semibold text-[#F1F5F9] flex-1 truncate">{s.player.name}</span>
+                  <span className={`font-bold text-lg ${getBalanceColor(s.total_balance)}`}>
                     {formatBalance(s.total_balance)}
                   </span>
-                  <span className="text-[10px] text-[#8B95A7] mt-0.5">Gesamt</span>
-                </div>
+                  <span className={`text-[#8B95A7] text-sm transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                    ⌄
+                  </span>
+                </button>
+
+                {/* Details — only when expanded */}
+                {isOpen && (
+                  <div className="border-t border-[#2A3344] animate-fade-in">
+                    <div className="grid grid-cols-3 divide-x divide-[#2A3344]">
+                      <StatCell icon="🏆" label="Siege" value={s.wins} />
+                      <StatCell icon="💀" label="1. Aus" value={s.first_eliminations} />
+                      <StatCell icon="💉" label="Revivals" value={s.revivals} />
+                    </div>
+                    <div className="grid grid-cols-3 divide-x divide-[#2A3344] border-t border-[#2A3344]">
+                      <StatCell icon="⚔️" label="Finals" value={s.final_appearances} />
+                      <StatCell icon="🔥" label="Streak" value={s.win_streak} highlight={s.win_streak >= 3} />
+                      <div className="flex flex-col items-center justify-center py-3">
+                        <span className="text-base mb-0.5">💰</span>
+                        <span className={`text-sm font-bold ${getBalanceColor(s.total_balance)}`}>
+                          {formatBalance(s.total_balance)}
+                        </span>
+                        <span className="text-[10px] text-[#8B95A7] mt-0.5">Gesamt</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>
