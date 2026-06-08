@@ -154,7 +154,7 @@ export default function StatistikenPage() {
             <div key={s.player.id} className="bg-[#1C1C1C] rounded-2xl border border-[#2E2E2E] overflow-hidden">
               {/* Player header */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-[#2E2E2E] bg-[#242424]">
-                <div className="w-8 h-8 rounded-full bg-[#D4A017] flex items-center justify-center text-[#111111] text-xs font-bold">
+                <div className="w-8 h-8 rounded-full bg-[#D62839] flex items-center justify-center text-[#111111] text-xs font-bold">
                   {i + 1}
                 </div>
                 <span className="font-semibold text-[#F5F5F5] flex-1">{s.player.name}</span>
@@ -202,7 +202,7 @@ function StatCell({
   return (
     <div className="flex flex-col items-center justify-center py-3 gap-0.5">
       <span className="text-base">{icon}</span>
-      <span className={`text-lg font-bold ${highlight ? 'text-[#D4A017]' : 'text-[#F5F5F5]'}`}>
+      <span className={`text-lg font-bold ${highlight ? 'text-[#D62839]' : 'text-[#F5F5F5]'}`}>
         {value}
       </span>
       <span className="text-[10px] text-[#9A9A9A]">{label}</span>

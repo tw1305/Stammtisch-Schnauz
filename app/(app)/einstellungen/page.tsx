@@ -82,12 +82,12 @@ export default function EinstellungenPage() {
               step="1"
               value={stakeInput}
               onChange={e => setStakeInput(e.target.value)}
-              className="flex-1 bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] outline-none focus:border-[#D4A017]"
+              className="flex-1 bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] outline-none focus:border-[#D62839]"
             />
             <span className="flex items-center text-[#9A9A9A]">€</span>
             <button
               onClick={saveStake}
-              className="bg-[#D4A017] text-[#111111] font-semibold rounded-xl px-4 py-2.5 text-sm"
+              className="bg-[#D62839] text-[#111111] font-semibold rounded-xl px-4 py-2.5 text-sm"
             >
               {saveMsg || 'Speichern'}
             </button>
@@ -107,12 +107,12 @@ export default function EinstellungenPage() {
               onChange={e => setNewPlayerName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addPlayer()}
               placeholder="Neuer Spieler..."
-              className="flex-1 bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] text-sm outline-none focus:border-[#D4A017]"
+              className="flex-1 bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] text-sm outline-none focus:border-[#D62839]"
             />
             <button
               onClick={addPlayer}
               disabled={!newPlayerName.trim()}
-              className="bg-[#D4A017] disabled:opacity-50 text-[#111111] font-semibold rounded-xl px-4 py-2.5 text-sm"
+              className="bg-[#D62839] disabled:opacity-50 text-[#111111] font-semibold rounded-xl px-4 py-2.5 text-sm"
             >
               + Hinzufügen
             </button>

@@ -47,7 +47,7 @@ export default function GameTable({
           }}
         >
           <div className="flex flex-col items-center justify-center h-full">
-            <span className="font-[family-name:var(--font-display)] text-[#D4A017] text-sm font-semibold leading-tight text-center">
+            <span className="font-[family-name:var(--font-display)] text-[#D62839] text-sm font-semibold leading-tight text-center">
               Schnauz
             </span>
             {isRoundActive && (

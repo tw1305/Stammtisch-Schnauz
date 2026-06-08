@@ -137,7 +137,7 @@ export default function SeasonsPage() {
     return (
       <div className="flex flex-col">
         <div className="flex items-center gap-3 px-4 pt-5 pb-3 border-b border-[#2E2E2E]">
-          <button onClick={() => setDetailSeason(null)} className="text-[#D4A017] text-sm">← Zurück</button>
+          <button onClick={() => setDetailSeason(null)} className="text-[#D62839] text-sm">← Zurück</button>
           <h1 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#F5F5F5] flex-1">
             {detailSeason.name}
           </h1>
@@ -187,7 +187,7 @@ export default function SeasonsPage() {
                       {' zahlt '}
                       <span className="text-[#22C55E]">{s.to.name}</span>
                     </span>
-                    <span className="text-[#D4A017] font-bold">{s.amount} €</span>
+                    <span className="text-[#D62839] font-bold">{s.amount} €</span>
                   </div>
                 ))}
               </div>
@@ -217,7 +217,7 @@ export default function SeasonsPage() {
         </h1>
         <button
           onClick={() => setShowNewForm(true)}
-          className="bg-[#D4A017] text-[#111111] font-semibold rounded-xl px-4 py-2 text-sm"
+          className="bg-[#D62839] text-[#111111] font-semibold rounded-xl px-4 py-2 text-sm"
         >
           + Neu
         </button>
@@ -225,19 +225,19 @@ export default function SeasonsPage() {
 
       {/* New season form */}
       {showNewForm && (
-        <div className="mx-4 mt-4 bg-[#1C1C1C] rounded-2xl border border-[#D4A017] p-4 space-y-3">
+        <div className="mx-4 mt-4 bg-[#1C1C1C] rounded-2xl border border-[#D62839] p-4 space-y-3">
           <h2 className="font-semibold text-[#F5F5F5]">Neue Season</h2>
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
             placeholder="Name (z.B. Q3 2025)"
-            className="w-full bg-[#111111] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] text-sm outline-none focus:border-[#D4A017]"
+            className="w-full bg-[#111111] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] text-sm outline-none focus:border-[#D62839]"
           />
           <input
             type="date"
             value={newStartDate}
             onChange={e => setNewStartDate(e.target.value)}
-            className="w-full bg-[#111111] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] text-sm outline-none focus:border-[#D4A017]"
+            className="w-full bg-[#111111] border border-[#2E2E2E] rounded-xl px-4 py-2.5 text-[#F5F5F5] text-sm outline-none focus:border-[#D62839]"
           />
           <div className="flex gap-2">
             <button
@@ -249,7 +249,7 @@ export default function SeasonsPage() {
             <button
               onClick={createSeason}
               disabled={!newName}
-              className="flex-1 bg-[#D4A017] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-2.5 text-sm"
+              className="flex-1 bg-[#D62839] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-2.5 text-sm"
             >
               Anlegen
             </button>
@@ -266,7 +266,7 @@ export default function SeasonsPage() {
             <button
               key={s.id}
               onClick={() => loadSeasonDetail(s)}
-              className="w-full text-left bg-[#1C1C1C] rounded-2xl border border-[#2E2E2E] p-4 hover:border-[#D4A017]/50 transition-colors"
+              className="w-full text-left bg-[#1C1C1C] rounded-2xl border border-[#2E2E2E] p-4 hover:border-[#D62839]/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="font-semibold text-[#F5F5F5]">

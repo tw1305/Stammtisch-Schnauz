@@ -32,7 +32,7 @@ export default function LoginPage() {
     <div className="min-h-dvh flex flex-col items-center justify-center bg-[#111111] px-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-[#D4A017] mb-2">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-[#D62839] mb-2">
             Schnauz
           </h1>
           <p className="text-[#9A9A9A] text-sm">Stammtisch Tracker</p>
@@ -50,7 +50,7 @@ export default function LoginPage() {
               onChange={e => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-3 text-[#F5F5F5] placeholder-[#9A9A9A] outline-none focus:border-[#D4A017] transition-colors"
+              className="w-full bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-3 text-[#F5F5F5] placeholder-[#9A9A9A] outline-none focus:border-[#D62839] transition-colors"
               placeholder="name@beispiel.de"
             />
           </div>
@@ -66,7 +66,7 @@ export default function LoginPage() {
               onChange={e => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-3 text-[#F5F5F5] placeholder-[#9A9A9A] outline-none focus:border-[#D4A017] transition-colors"
+              className="w-full bg-[#1C1C1C] border border-[#2E2E2E] rounded-xl px-4 py-3 text-[#F5F5F5] placeholder-[#9A9A9A] outline-none focus:border-[#D62839] transition-colors"
               placeholder="••••••••"
             />
           </div>
@@ -78,7 +78,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#D4A017] hover:bg-[#E8B420] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-3 transition-colors mt-2"
+            className="w-full bg-[#D62839] hover:bg-[#E8364A] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-3 transition-colors mt-2"
           >
             {loading ? 'Anmelden...' : 'Anmelden'}
           </button>

@@ -137,7 +137,7 @@ export default function SpielPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 gap-6">
         <div className="text-center">
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#D4A017] mb-2">
+          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#D62839] mb-2">
             Schnauz
           </h1>
           {activeSeason ? (
@@ -151,7 +151,7 @@ export default function SpielPage() {
           <button
             onClick={handleStartSession}
             disabled={allPlayers.length < 2}
-            className="bg-[#D4A017] hover:bg-[#E8B420] disabled:opacity-50 text-[#111111] font-semibold rounded-xl px-8 py-4 text-lg transition-colors"
+            className="bg-[#D62839] hover:bg-[#E8364A] disabled:opacity-50 text-[#111111] font-semibold rounded-xl px-8 py-4 text-lg transition-colors"
           >
             ▶ Neue Session starten
           </button>
@@ -249,7 +249,7 @@ export default function SpielPage() {
                 onClick={() => { setSelectedMultiplier(opt.multiplier); setShowCustomInput(false) }}
                 className={`flex-1 min-w-[60px] rounded-xl py-2.5 text-sm font-semibold transition-colors border
                   ${isSelected
-                    ? 'bg-[#D4A017] border-[#D4A017] text-[#111111]'
+                    ? 'bg-[#D62839] border-[#D62839] text-[#111111]'
                     : 'bg-[#242424] border-[#2E2E2E] text-[#F5F5F5]'
                   }`}
               >
@@ -261,7 +261,7 @@ export default function SpielPage() {
             onClick={() => setShowCustomInput(true)}
             className={`flex-1 min-w-[44px] rounded-xl py-2.5 text-sm font-semibold transition-colors border
               ${showCustomInput
-                ? 'bg-[#D4A017] border-[#D4A017] text-[#111111]'
+                ? 'bg-[#D62839] border-[#D62839] text-[#111111]'
                 : 'bg-[#242424] border-[#2E2E2E] text-[#9A9A9A]'
               }`}
           >
@@ -277,7 +277,7 @@ export default function SpielPage() {
             value={customStake}
             onChange={e => setCustomStake(e.target.value)}
             placeholder="Eigener Einsatz (€)"
-            className="mt-2 w-full bg-[#1C1C1C] border border-[#D4A017] rounded-xl px-4 py-2.5 text-[#F5F5F5] outline-none text-sm"
+            className="mt-2 w-full bg-[#1C1C1C] border border-[#D62839] rounded-xl px-4 py-2.5 text-[#F5F5F5] outline-none text-sm"
             autoFocus
           />
         )}
@@ -288,7 +288,7 @@ export default function SpielPage() {
         <button
           onClick={handleStartRound}
           disabled={sessionPlayers.length < 2}
-          className="w-full bg-[#D4A017] hover:bg-[#E8B420] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-4 text-base transition-colors"
+          className="w-full bg-[#D62839] hover:bg-[#E8364A] disabled:opacity-50 text-[#111111] font-semibold rounded-xl py-4 text-base transition-colors"
         >
           ▶ Neue Runde starten ({effectiveStake} €)
         </button>
@@ -379,7 +379,7 @@ function PlayerManagerOverlay({
           })}
         </div>
         <div className="px-5 py-4 border-t border-[#2E2E2E]">
-          <button onClick={onClose} className="w-full bg-[#D4A017] text-[#111111] font-semibold rounded-xl py-3">
+          <button onClick={onClose} className="w-full bg-[#D62839] text-[#111111] font-semibold rounded-xl py-3">
             Fertig
           </button>
         </div>

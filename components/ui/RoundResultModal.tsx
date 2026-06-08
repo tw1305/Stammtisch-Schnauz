@@ -68,7 +68,7 @@ export default function RoundResultModal({
         <div className="px-5 pb-5 space-y-2">
           <button
             onClick={onNewRound}
-            className="w-full bg-[#D4A017] hover:bg-[#E8B420] text-[#111111] font-semibold rounded-xl py-3 transition-colors"
+            className="w-full bg-[#D62839] hover:bg-[#E8364A] text-[#111111] font-semibold rounded-xl py-3 transition-colors"
           >
             ▶ Neue Runde
           </button>
