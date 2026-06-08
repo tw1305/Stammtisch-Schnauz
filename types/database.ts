@@ -1,0 +1,82 @@
+export type Player = {
+  id: string
+  name: string
+  avatar_url: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type Season = {
+  id: string
+  name: string
+  start_date: string
+  end_date: string | null
+  status: 'active' | 'completed'
+  created_at: string
+}
+
+export type Session = {
+  id: string
+  season_id: string
+  created_by: string
+  started_at: string
+  ended_at: string | null
+  status: 'active' | 'completed'
+}
+
+export type SessionPlayer = {
+  id: string
+  session_id: string
+  player_id: string
+  joined_at: string
+  removed_at: string | null
+  player?: Player
+}
+
+export type Round = {
+  id: string
+  session_id: string
+  round_number: number
+  stake: number
+  player_count: number
+  winner_id: string | null
+  started_at: string
+  ended_at: string | null
+  status: 'active' | 'completed'
+}
+
+export type RoundPlayer = {
+  id: string
+  round_id: string
+  player_id: string
+  is_active: boolean
+  was_revived: boolean
+  was_first_eliminated: boolean
+  reached_final: boolean
+  is_winner: boolean
+  balance_change: number | null
+  player?: Player
+}
+
+export type AppSettings = {
+  id: string
+  user_id: string
+  default_stake: number
+  updated_at: string
+}
+
+export type PlayerStats = {
+  player: Player
+  wins: number
+  first_eliminations: number
+  revivals: number
+  final_appearances: number
+  win_streak: number
+  total_balance: number
+}
+
+export type DebtSettlement = {
+  from: Player
+  to: Player
+  amount: number
+}
