@@ -161,9 +161,9 @@ function PlayerEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[60] flex items-end animate-fade-in" onClick={onClose}>
       <div
-        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] animate-pop-in"
+        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[90vh] overflow-y-auto animate-pop-in"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
@@ -217,7 +217,7 @@ function PlayerEditor({
           </button>
         </div>
 
-        <div className="px-5 pb-6 pt-1">
+        <div className="px-5 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           <button
             onClick={save}
             disabled={saving || !name.trim()}

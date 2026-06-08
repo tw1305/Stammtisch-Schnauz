@@ -390,9 +390,9 @@ function PlayerManagerOverlay({
   const canAdd = sessionPlayers.length < 9
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[60] flex items-end animate-fade-in" onClick={onClose}>
       <div
-        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[72vh] flex flex-col animate-pop-in"
+        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[80vh] flex flex-col animate-pop-in"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
@@ -427,7 +427,7 @@ function PlayerManagerOverlay({
             )
           })}
         </div>
-        <div className="px-5 py-4 border-t border-[#2A3344]">
+        <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#2A3344]">
           <button onClick={onClose} className="w-full bg-[#6366F1] text-white font-semibold rounded-2xl py-3">
             Fertig
           </button>

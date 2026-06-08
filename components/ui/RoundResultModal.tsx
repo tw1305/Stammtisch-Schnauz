@@ -23,7 +23,7 @@ export default function RoundResultModal({
   const winnerGain = winner?.balance_change ?? 0
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end justify-center z-50 p-4 pb-24 animate-fade-in">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end justify-center z-[60] p-4 pb-24 animate-fade-in">
       <div className="w-full max-w-sm bg-[#141925] rounded-3xl border border-[#2A3344] overflow-hidden shadow-2xl animate-pop-in">
         {/* Header */}
         <div className="px-5 py-6 text-center border-b border-[#2A3344] relative overflow-hidden"

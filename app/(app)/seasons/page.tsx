@@ -74,14 +74,33 @@ export default function SeasonsPage() {
     }
   }
 
-  async function completeSeason(season: Season) {
-    if (!confirm(`Season "${season.name}" wirklich abschließen?`)) return
-    await supabase
-      .from('seasons')
-      .update({ status: 'completed', end_date: new Date().toISOString().split('T')[0] })
-      .eq('id', season.id)
+  async function setSeasonStatus(season: Season, status: 'active' | 'completed') {
+    if (status === 'active') {
+      if (!confirm('Season wieder aktivieren? Eine andere aktive Season wird dabei abgeschlossen.')) return
+      // Nur eine Season darf aktiv sein
+      await supabase
+        .from('seasons')
+        .update({ status: 'completed', end_date: new Date().toISOString().split('T')[0] })
+        .eq('status', 'active')
+        .neq('id', season.id)
+      await supabase
+        .from('seasons')
+        .update({ status: 'active', end_date: null })
+        .eq('id', season.id)
+    } else {
+      if (!confirm(`Season "${season.name}" wirklich abschließen?`)) return
+      await supabase
+        .from('seasons')
+        .update({ status: 'completed', end_date: new Date().toISOString().split('T')[0] })
+        .eq('id', season.id)
+    }
+    const updated: Season = {
+      ...season,
+      status,
+      end_date: status === 'active' ? null : new Date().toISOString().split('T')[0],
+    }
+    setDetailSeason(updated)
     await loadSeasons()
-    loadSeasonDetail({ ...season, status: 'completed' })
   }
 
   async function loadSeasonDetail(season: Season) {
@@ -282,15 +301,25 @@ export default function SeasonsPage() {
             </div>
           </div>
 
-          {/* Close season */}
-          {detailSeason.status === 'active' && (
-            <button
-              onClick={() => completeSeason(detailSeason)}
-              className="w-full bg-[#141925] border border-[#F87171]/40 text-[#F87171] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#F87171]/5"
-            >
-              Season abschließen
-            </button>
-          )}
+          {/* Season status */}
+          <div>
+            <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">Status</p>
+            {detailSeason.status === 'active' ? (
+              <button
+                onClick={() => setSeasonStatus(detailSeason, 'completed')}
+                className="w-full bg-[#141925] border border-[#F87171]/40 text-[#F87171] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#F87171]/5"
+              >
+                Season abschließen
+              </button>
+            ) : (
+              <button
+                onClick={() => setSeasonStatus(detailSeason, 'active')}
+                className="w-full bg-[#141925] border border-[#34D399]/40 text-[#34D399] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#34D399]/5"
+              >
+                Season wieder aktivieren
+              </button>
+            )}
+          </div>
         </div>
 
         {editingRound && (
@@ -434,9 +463,9 @@ function RoundEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[60] flex items-end animate-fade-in" onClick={onClose}>
       <div
-        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[80vh] flex flex-col animate-pop-in"
+        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[85vh] flex flex-col animate-pop-in"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
@@ -503,7 +532,7 @@ function RoundEditor({
           </div>
         )}
 
-        <div className="px-5 py-4 border-t border-[#2A3344]">
+        <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#2A3344]">
           <button
             onClick={save}
             disabled={saving || loading}
