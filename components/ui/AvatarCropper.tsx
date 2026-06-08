@@ -37,18 +37,20 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
   useEffect(() => {
     if (!nat) return
     const e = (FRAME / Math.min(nat.w, nat.h)) * zoom
-    const w = nat.w * e
-    const h = nat.h * e
+    const hx = Math.max(0, (nat.w * e - FRAME) / 2)
+    const hy = Math.max(0, (nat.h * e - FRAME) / 2)
     setOffset(o => ({
-      x: Math.min(0, Math.max(FRAME - w, o.x)),
-      y: Math.min(0, Math.max(FRAME - h, o.y)),
+      x: Math.max(-hx, Math.min(hx, o.x)),
+      y: Math.max(-hy, Math.min(hy, o.y)),
     }))
   }, [zoom, nat])
 
   function clampOffset(x: number, y: number) {
+    const hx = Math.max(0, (rw - FRAME) / 2)
+    const hy = Math.max(0, (rh - FRAME) / 2)
     return {
-      x: Math.min(0, Math.max(FRAME - rw, x)),
-      y: Math.min(0, Math.max(FRAME - rh, y)),
+      x: Math.max(-hx, Math.min(hx, x)),
+      y: Math.max(-hy, Math.min(hy, y)),
     }
   }
 
