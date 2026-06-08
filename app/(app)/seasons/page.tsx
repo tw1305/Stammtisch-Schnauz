@@ -10,6 +10,7 @@ import {
   getBalanceColor,
 } from '@/lib/game-logic'
 import type { Season, Player, DebtSettlement, Session, Round, RoundPlayer } from '@/types/database'
+import Portal from '@/components/ui/Portal'
 
 type SeasonWithStats = Season & { roundCount: number; avgStake: number }
 type SessionWithRounds = { session: Session; rounds: Round[] }
@@ -463,7 +464,8 @@ function RoundEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[60] flex items-end animate-fade-in" onClick={onClose}>
+    <Portal>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
       <div
         className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[85vh] flex flex-col animate-pop-in"
         onClick={e => e.stopPropagation()}
@@ -543,5 +545,6 @@ function RoundEditor({
         </div>
       </div>
     </div>
+    </Portal>
   )
 }

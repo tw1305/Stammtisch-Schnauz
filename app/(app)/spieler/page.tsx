@@ -3,31 +3,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
+import Portal from '@/components/ui/Portal'
+import AvatarCropper from '@/components/ui/AvatarCropper'
 import type { Player } from '@/types/database'
 
-async function fileToAvatar(file: File): Promise<string> {
-  const dataUrl = await new Promise<string>((res, rej) => {
+function readFile(file: File): Promise<string> {
+  return new Promise((res, rej) => {
     const r = new FileReader()
     r.onload = () => res(r.result as string)
     r.onerror = rej
     r.readAsDataURL(file)
   })
-  const img = await new Promise<HTMLImageElement>((res, rej) => {
-    const im = new Image()
-    im.onload = () => res(im)
-    im.onerror = rej
-    im.src = dataUrl
-  })
-  const size = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  const scale = Math.max(size / img.width, size / img.height)
-  const w = img.width * scale
-  const h = img.height * scale
-  ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h)
-  return canvas.toDataURL('image/jpeg', 0.85)
 }
 
 export default function SpielerPage() {
@@ -133,20 +119,19 @@ function PlayerEditor({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(player.avatar_url)
   const [isActive, setIsActive] = useState(player.is_active)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploading(true)
     try {
-      const dataUrl = await fileToAvatar(file)
-      setAvatarUrl(dataUrl)
+      const dataUrl = await readFile(file)
+      setCropSrc(dataUrl) // open cropper with the chosen image
     } catch {
-      alert('Bild konnte nicht verarbeitet werden.')
+      alert('Bild konnte nicht geladen werden.')
     }
-    setUploading(false)
+    e.target.value = '' // allow re-selecting the same file
   }
 
   async function save() {
@@ -161,72 +146,95 @@ function PlayerEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[60] flex items-end animate-fade-in" onClick={onClose}>
-      <div
-        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[90vh] overflow-y-auto animate-pop-in"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
-          <h2 className="font-[family-name:var(--font-display)] font-bold text-lg text-[#F1F5F9]">Profil bearbeiten</h2>
-          <button onClick={onClose} className="text-[#8B95A7] text-2xl leading-none w-8 h-8">×</button>
-        </div>
+    <Portal>
+      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
+        <div
+          className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[90vh] overflow-y-auto animate-pop-in"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
+            <h2 className="font-[family-name:var(--font-display)] font-bold text-lg text-[#F1F5F9]">Profil bearbeiten</h2>
+            <button onClick={onClose} className="text-[#8B95A7] text-2xl leading-none w-8 h-8">×</button>
+          </div>
 
-        <div className="px-5 py-5 space-y-5">
-          {/* Avatar */}
-          <div className="flex flex-col items-center gap-3">
-            <PlayerAvatar name={name || '?'} avatarUrl={avatarUrl} size={96} />
-            <div className="flex gap-2">
+          <div className="px-5 py-5 space-y-5">
+            {/* Avatar */}
+            <div className="flex flex-col items-center gap-3">
               <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F1F5F9] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                onClick={() => avatarUrl && setCropSrc(avatarUrl)}
+                className="rounded-full"
+                title={avatarUrl ? 'Bild ausrichten' : undefined}
               >
-                {uploading ? 'Lädt...' : '📷 Bild wählen'}
+                <PlayerAvatar name={name || '?'} avatarUrl={avatarUrl} size={96} />
               </button>
-              {avatarUrl && (
+              <div className="flex gap-2 flex-wrap justify-center">
                 <button
-                  onClick={() => setAvatarUrl(null)}
-                  className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F87171] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                  onClick={() => fileRef.current?.click()}
+                  className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F1F5F9] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
                 >
-                  Entfernen
+                  📷 Bild wählen
                 </button>
-              )}
+                {avatarUrl && (
+                  <>
+                    <button
+                      onClick={() => setCropSrc(avatarUrl)}
+                      className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F1F5F9] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                    >
+                      ✂️ Ausrichten
+                    </button>
+                    <button
+                      onClick={() => setAvatarUrl(null)}
+                      className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F87171] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                    >
+                      Entfernen
+                    </button>
+                  </>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
             </div>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+
+            {/* Name */}
+            <div>
+              <label className="block text-[#8B95A7] text-xs uppercase tracking-wider mb-2 font-medium">Anzeigename</label>
+              <input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] outline-none focus:border-[#6366F1] transition-colors"
+              />
+            </div>
+
+            {/* Active toggle */}
+            <button
+              onClick={() => setIsActive(v => !v)}
+              className="w-full flex items-center justify-between bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3"
+            >
+              <span className="text-[#F1F5F9] text-sm">Aktiv (spielt mit)</span>
+              <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${isActive ? 'bg-[#6366F1]' : 'bg-[#2A3344]'}`}>
+                <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${isActive ? 'translate-x-5' : ''}`} />
+              </span>
+            </button>
           </div>
 
-          {/* Name */}
-          <div>
-            <label className="block text-[#8B95A7] text-xs uppercase tracking-wider mb-2 font-medium">Anzeigename</label>
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] outline-none focus:border-[#6366F1] transition-colors"
-            />
+          <div className="px-5 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+            <button
+              onClick={save}
+              disabled={saving || !name.trim()}
+              className="w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 transition-colors"
+            >
+              {saving ? 'Speichern...' : 'Speichern'}
+            </button>
           </div>
-
-          {/* Active toggle */}
-          <button
-            onClick={() => setIsActive(v => !v)}
-            className="w-full flex items-center justify-between bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3"
-          >
-            <span className="text-[#F1F5F9] text-sm">Aktiv (spielt mit)</span>
-            <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${isActive ? 'bg-[#6366F1]' : 'bg-[#2A3344]'}`}>
-              <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${isActive ? 'translate-x-5' : ''}`} />
-            </span>
-          </button>
-        </div>
-
-        <div className="px-5 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-          <button
-            onClick={save}
-            disabled={saving || !name.trim()}
-            className="w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 transition-colors"
-          >
-            {saving ? 'Speichern...' : 'Speichern'}
-          </button>
         </div>
       </div>
-    </div>
+
+      {cropSrc && (
+        <AvatarCropper
+          src={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onConfirm={dataUrl => { setAvatarUrl(dataUrl); setCropSrc(null) }}
+        />
+      )}
+    </Portal>
   )
 }

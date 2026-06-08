@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession'
 import GameTable from '@/components/ui/GameTable'
 import RoundResultModal from '@/components/ui/RoundResultModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
+import Portal from '@/components/ui/Portal'
 import type { Season, Player } from '@/types/database'
 
 const STAKE_OPTIONS = [
@@ -390,7 +391,8 @@ function PlayerManagerOverlay({
   const canAdd = sessionPlayers.length < 9
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[60] flex items-end animate-fade-in" onClick={onClose}>
+    <Portal>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
       <div
         className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[80vh] flex flex-col animate-pop-in"
         onClick={e => e.stopPropagation()}
@@ -434,5 +436,6 @@ function PlayerManagerOverlay({
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
