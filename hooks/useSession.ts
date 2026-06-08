@@ -146,30 +146,8 @@ export function useSession() {
     await loadActiveSession()
   }
 
-  async function eliminatePlayer(playerId: string) {
+  async function refreshRoundState() {
     if (!activeRound) return
-
-    const rp = roundPlayers.find(r => r.player_id === playerId)
-    if (!rp) return
-
-    if (rp.is_active) {
-      // Eliminate
-      const firstEliminated = roundPlayers.every(r => r.is_active || r.player_id === playerId)
-      await supabase
-        .from('round_players')
-        .update({
-          is_active: false,
-          was_first_eliminated: firstEliminated && !rp.was_revived,
-        })
-        .eq('id', rp.id)
-    } else {
-      // Revive
-      await supabase
-        .from('round_players')
-        .update({ is_active: true, was_revived: true })
-        .eq('id', rp.id)
-    }
-
     const { data: updatedRp } = await supabase
       .from('round_players')
       .select('*, player:players(*)')
@@ -196,6 +174,49 @@ export function useSession() {
     if (activePlayers.length === 1) {
       await endRound(updated, activePlayers[0].player_id)
     }
+  }
+
+  async function eliminatePlayer(playerId: string) {
+    if (!activeRound) return
+    const rp = roundPlayers.find(r => r.player_id === playerId)
+    if (!rp || !rp.is_active) return
+
+    const firstEliminated = roundPlayers.every(r => r.is_active || r.player_id === playerId)
+    await supabase
+      .from('round_players')
+      .update({
+        is_active: false,
+        was_first_eliminated: firstEliminated && !rp.was_revived,
+      })
+      .eq('id', rp.id)
+
+    await refreshRoundState()
+  }
+
+  async function revivePlayer(playerId: string, reviverId: string) {
+    if (!activeRound) return
+    const rp = roundPlayers.find(r => r.player_id === playerId)
+    if (!rp || rp.is_active) return
+
+    await supabase
+      .from('round_players')
+      .update({ is_active: true, was_revived: true })
+      .eq('id', rp.id)
+
+    // Credit the reviver (defensive: works even before the column exists)
+    const reviver = roundPlayers.find(r => r.player_id === reviverId)
+    if (reviver) {
+      try {
+        await supabase
+          .from('round_players')
+          .update({ revives_given: (reviver.revives_given ?? 0) + 1 })
+          .eq('id', reviver.id)
+      } catch {
+        // revives_given column may not exist yet — ignore
+      }
+    }
+
+    await refreshRoundState()
   }
 
   async function endRound(players: RoundPlayer[], winnerId: string) {
@@ -268,6 +289,7 @@ export function useSession() {
     removePlayerFromSession,
     startRound,
     eliminatePlayer,
+    revivePlayer,
     endSession,
     dismissCompletedRound,
     reload: loadActiveSession,

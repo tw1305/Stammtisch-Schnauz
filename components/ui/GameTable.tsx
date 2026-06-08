@@ -15,13 +15,13 @@ type GameTableProps = {
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
 
 function sizingFor(count: number): Sizing {
-  if (count <= 3) return { avatar: 94, name: 'text-base', bal: 'text-sm', radius: 35 }
-  if (count === 4) return { avatar: 84, name: 'text-sm', bal: 'text-[13px]', radius: 36 }
-  if (count === 5) return { avatar: 76, name: 'text-sm', bal: 'text-xs', radius: 37 }
-  if (count === 6) return { avatar: 68, name: 'text-[13px]', bal: 'text-xs', radius: 38 }
-  if (count === 7) return { avatar: 62, name: 'text-xs', bal: 'text-[11px]', radius: 39 }
-  if (count === 8) return { avatar: 58, name: 'text-xs', bal: 'text-[11px]', radius: 40 }
-  return { avatar: 52, name: 'text-[11px]', bal: 'text-[10px]', radius: 41 }
+  if (count <= 3) return { avatar: 100, name: 'text-sm', bal: 'text-sm', radius: 38 }
+  if (count === 4) return { avatar: 90, name: 'text-sm', bal: 'text-[13px]', radius: 38 }
+  if (count === 5) return { avatar: 80, name: 'text-[13px]', bal: 'text-xs', radius: 39 }
+  if (count === 6) return { avatar: 72, name: 'text-xs', bal: 'text-xs', radius: 39 }
+  if (count === 7) return { avatar: 66, name: 'text-xs', bal: 'text-[11px]', radius: 40 }
+  if (count === 8) return { avatar: 60, name: 'text-[11px]', bal: 'text-[11px]', radius: 41 }
+  return { avatar: 56, name: 'text-[11px]', bal: 'text-[10px]', radius: 41 }
 }
 
 export default function GameTable({
@@ -102,7 +102,7 @@ export default function GameTable({
             key={sp.player_id}
             onClick={() => onPlayerTap?.(sp.player_id)}
             disabled={!onPlayerTap}
-            className="absolute flex flex-col items-center gap-1 -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform"
+            className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform"
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
           >
             <PlayerAvatar
@@ -112,21 +112,32 @@ export default function GameTable({
               eliminated={isEliminated}
               isWinner={isWinner}
             />
-            <span
-              className={`${nameClass} font-semibold text-center leading-tight max-w-[92px] truncate
-                ${isEliminated ? 'text-[#7C7461] line-through' : 'text-[#23201A]'}
+            {/* Name plate — ties avatar, name and balance into one token */}
+            <div
+              className={`-mt-2.5 px-2.5 py-1 rounded-xl border shadow-sm flex flex-col items-center min-w-[58px] max-w-[104px] relative z-10
+                ${isEliminated
+                  ? 'bg-[#F0E8D6] border-[#E4D9BF] opacity-60'
+                  : isWinner
+                    ? 'bg-[#FFFDF7] border-[#2E6B3A]'
+                    : 'bg-[#FFFDF7] border-[#E4D9BF]'}
               `}
             >
-              {player.name}
-            </span>
-            {!isRoundActive && (
-              <span className={`${balClass} font-bold ${getBalanceColor(balance)}`}>
-                {formatBalance(balance)}
+              <span
+                className={`${nameClass} font-semibold leading-tight truncate max-w-full
+                  ${isEliminated ? 'text-[#7C7461] line-through' : 'text-[#23201A]'}
+                `}
+              >
+                {player.name}
               </span>
-            )}
-            {isRoundActive && isEliminated && (
-              <span className="text-xs leading-none">💀</span>
-            )}
+              {!isRoundActive && (
+                <span className={`${balClass} font-bold leading-tight ${getBalanceColor(balance)}`}>
+                  {formatBalance(balance)}
+                </span>
+              )}
+              {isRoundActive && isEliminated && (
+                <span className="text-[10px] leading-none mt-0.5">💀</span>
+              )}
+            </div>
           </button>
         )
       })}

@@ -55,6 +55,7 @@ export type RoundPlayer = {
   reached_final: boolean
   is_winner: boolean
   balance_change: number | null
+  revives_given: number
   player?: Player
 }
 
@@ -70,6 +71,7 @@ export type PlayerStats = {
   wins: number
   first_eliminations: number
   revivals: number
+  revives_given: number
   final_appearances: number
   win_streak: number
   total_balance: number

@@ -28,6 +28,7 @@ for (const id of ids) {
       reached_final: false,
       was_first_eliminated: false,
       was_revived: false,
+      revives_given: 0,
     })
     .eq('round_id', id)
   console.log('  round_players reset', id, '→', error?.message ?? 'ok')

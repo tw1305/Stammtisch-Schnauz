@@ -41,7 +41,7 @@ export default function RoundResultModal({
         {/* Session Standings */}
         <div className="px-5 py-4">
           <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">
-            Session-Stand
+            Saison-Stand
           </p>
           <div className="space-y-2">
             {players

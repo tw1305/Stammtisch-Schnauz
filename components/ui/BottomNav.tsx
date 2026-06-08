@@ -63,7 +63,7 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 bg-[#FBF6EA]/95 backdrop-blur-lg border-t border-[#E4D9BF] pb-safe z-50">
       <div className="flex max-w-md mx-auto">
         {tabs.map(({ href, label, Icon }) => {
-          const active = pathname.startsWith(href)
+          const active = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
               key={href}

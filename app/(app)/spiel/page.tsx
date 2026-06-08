@@ -8,7 +8,7 @@ import GameTable from '@/components/ui/GameTable'
 import RoundResultModal from '@/components/ui/RoundResultModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import type { Season, Player } from '@/types/database'
+import type { Season, Player, RoundPlayer } from '@/types/database'
 
 const STAKE_OPTIONS = [
   { label: 'Standard', multiplier: 1 },
@@ -34,6 +34,7 @@ export default function SpielPage() {
     removePlayerFromSession,
     startRound,
     eliminatePlayer,
+    revivePlayer,
     endSession,
     dismissCompletedRound,
     reload,
@@ -48,14 +49,15 @@ export default function SpielPage() {
   const [showPlayerManager, setShowPlayerManager] = useState(false)
   const [sessionBalances, setSessionBalances] = useState<Record<string, number>>({})
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set())
+  const [reviveTarget, setReviveTarget] = useState<string | null>(null)
 
   useEffect(() => {
     loadMeta()
   }, [])
 
   useEffect(() => {
-    if (session) loadSessionBalances()
-  }, [session, completedRound])
+    if (activeSeason) loadSeasonBalances()
+  }, [activeSeason, session, completedRound, roundPlayers])
 
   async function loadMeta() {
     const { data: seasons } = await supabase
@@ -80,20 +82,32 @@ export default function SpielPage() {
     if (saved) setDefaultStake(parseInt(saved))
   }
 
-  async function loadSessionBalances() {
-    if (!session) return
-    const { data: rounds } = await supabase
-      .from('rounds')
+  // Season-wide balance (carry-over + all sessions of the active season)
+  async function loadSeasonBalances() {
+    if (!activeSeason) return
+    const { data: sessions } = await supabase
+      .from('sessions')
       .select('id')
-      .eq('session_id', session.id)
-      .eq('status', 'completed')
+      .eq('season_id', activeSeason.id)
 
-    if (!rounds || rounds.length === 0) {
+    const sessionIds = (sessions || []).map(s => s.id)
+    if (sessionIds.length === 0) {
       setSessionBalances({})
       return
     }
 
-    const roundIds = rounds.map(r => r.id)
+    const { data: rounds } = await supabase
+      .from('rounds')
+      .select('id')
+      .in('session_id', sessionIds)
+      .eq('status', 'completed')
+
+    const roundIds = (rounds || []).map(r => r.id)
+    if (roundIds.length === 0) {
+      setSessionBalances({})
+      return
+    }
+
     const { data: rps } = await supabase
       .from('round_players')
       .select('player_id, balance_change')
@@ -133,7 +147,14 @@ export default function SpielPage() {
 
   async function handlePlayerTap(playerId: string) {
     if (!activeRound) return
-    await eliminatePlayer(playerId)
+    const rp = roundPlayers.find(r => r.player_id === playerId)
+    if (!rp) return
+    if (rp.is_active) {
+      await eliminatePlayer(playerId)
+    } else {
+      // Reviving requires choosing who revived this player
+      setReviveTarget(playerId)
+    }
   }
 
   async function handleEndSession() {
@@ -245,6 +266,19 @@ export default function SpielPage() {
         <div className="px-4 pb-4 text-center text-[#7C7461] text-sm">
           💡 Spieler antippen zum Ausscheiden / Wiederbeleben
         </div>
+
+        {reviveTarget && (
+          <ReviveModal
+            revivedName={roundPlayers.find(r => r.player_id === reviveTarget)?.player?.name ?? ''}
+            candidates={roundPlayers.filter(r => r.is_active && r.player_id !== reviveTarget)}
+            onPick={async reviverId => {
+              const target = reviveTarget
+              setReviveTarget(null)
+              if (target) await revivePlayer(target, reviverId)
+            }}
+            onClose={() => setReviveTarget(null)}
+          />
+        )}
       </div>
     )
   }
@@ -436,6 +470,58 @@ function PlayerManagerOverlay({
         </div>
       </div>
     </div>
+    </Portal>
+  )
+}
+
+function ReviveModal({
+  revivedName,
+  candidates,
+  onPick,
+  onClose,
+}: {
+  revivedName: string
+  candidates: RoundPlayer[]
+  onPick: (reviverId: string) => void
+  onClose: () => void
+}) {
+  return (
+    <Portal>
+      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
+        <div
+          className="w-full max-w-md mx-auto bg-[#FBF6EA] rounded-t-3xl border-t border-[#E4D9BF] max-h-[80vh] flex flex-col animate-pop-in"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 border-b border-[#E4D9BF]">
+            <h2 className="font-[family-name:var(--font-display)] font-bold text-[#23201A]">
+              {revivedName} wiederbeleben
+            </h2>
+            <p className="text-[#7C7461] text-sm mt-0.5">Wer hat sich vergeben?</p>
+          </div>
+          <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1.5">
+            {candidates.length === 0 ? (
+              <p className="text-[#7C7461] text-sm text-center py-4">Keine möglichen Wiederbeleber</p>
+            ) : (
+              candidates.map(c => (
+                <button
+                  key={c.player_id}
+                  onClick={() => onPick(c.player_id)}
+                  className="w-full flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-[#FFFDF7] transition-colors"
+                >
+                  <PlayerAvatar name={c.player?.name ?? ''} avatarUrl={c.player?.avatar_url} size={36} />
+                  <span className="text-[#23201A] flex-1 text-left">{c.player?.name}</span>
+                  <span className="text-[#2E6B3A] text-sm font-medium">wählen</span>
+                </button>
+              ))
+            )}
+          </div>
+          <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#E4D9BF]">
+            <button onClick={onClose} className="w-full bg-[#FFFDF7] border border-[#E4D9BF] text-[#7C7461] font-medium rounded-2xl py-3">
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      </div>
     </Portal>
   )
 }
