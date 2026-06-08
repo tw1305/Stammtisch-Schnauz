@@ -72,12 +72,9 @@ export function useSession() {
   }, [loadActiveSession])
 
   async function startSession(seasonId: string, playerIds: string[]) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     const { data: sess, error } = await supabase
       .from('sessions')
-      .insert({ season_id: seasonId, created_by: user.id, status: 'active' })
+      .insert({ season_id: seasonId, status: 'active' })
       .select()
       .single()
 

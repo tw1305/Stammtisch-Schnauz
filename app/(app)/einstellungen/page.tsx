@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import type { Player } from '@/types/database'
 
+const STAKE_KEY = 'schnauz_default_stake'
+
 export default function EinstellungenPage() {
   const supabase = createClient()
-  const router = useRouter()
   const [defaultStake, setDefaultStake] = useState(3)
   const [stakeInput, setStakeInput] = useState('3')
   const [players, setPlayers] = useState<Player[]>([])
@@ -16,43 +16,28 @@ export default function EinstellungenPage() {
   const [loading, setLoading] = useState(true)
   const [saveMsg, setSaveMsg] = useState('')
 
-  useEffect(() => { loadData() }, [])
-
-  async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: settings } = await supabase
-        .from('app_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-      if (settings) {
-        setDefaultStake(settings.default_stake)
-        setStakeInput(String(settings.default_stake))
-      }
+  useEffect(() => {
+    const saved = localStorage.getItem(STAKE_KEY)
+    if (saved) {
+      setDefaultStake(parseInt(saved))
+      setStakeInput(saved)
     }
+    loadPlayers()
+  }, [])
 
-    const { data: pls } = await supabase
+  async function loadPlayers() {
+    const { data } = await supabase
       .from('players')
       .select('*')
       .order('name')
-    setPlayers(pls || [])
+    setPlayers(data || [])
     setLoading(false)
   }
 
-  async function saveStake() {
+  function saveStake() {
     const val = parseInt(stakeInput)
     if (!val || val < 1) return
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    await supabase.from('app_settings').upsert({
-      user_id: user.id,
-      default_stake: val,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-
+    localStorage.setItem(STAKE_KEY, String(val))
     setDefaultStake(val)
     setSaveMsg('Gespeichert ✓')
     setTimeout(() => setSaveMsg(''), 2000)
@@ -63,7 +48,7 @@ export default function EinstellungenPage() {
     if (!name) return
     await supabase.from('players').insert({ name })
     setNewPlayerName('')
-    loadData()
+    loadPlayers()
   }
 
   async function togglePlayerActive(player: Player) {
@@ -71,12 +56,7 @@ export default function EinstellungenPage() {
       .from('players')
       .update({ is_active: !player.is_active })
       .eq('id', player.id)
-    loadData()
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
+    loadPlayers()
   }
 
   if (loading) {
@@ -113,7 +93,7 @@ export default function EinstellungenPage() {
             </button>
           </div>
           <p className="text-[#9A9A9A] text-xs mt-1.5">
-            Aktuell: {defaultStake} € · Standard = 1×, Double = {defaultStake * 2} €, Triple = {defaultStake * 3} €
+            Aktuell: {defaultStake} € · Double = {defaultStake * 2} € · Triple = {defaultStake * 3} €
           </p>
         </div>
 
@@ -121,7 +101,6 @@ export default function EinstellungenPage() {
         <div>
           <p className="text-[#9A9A9A] text-xs uppercase tracking-wider mb-3 font-medium">Spieler verwalten</p>
 
-          {/* Add new player */}
           <div className="flex gap-2 mb-3">
             <input
               value={newPlayerName}
@@ -139,7 +118,6 @@ export default function EinstellungenPage() {
             </button>
           </div>
 
-          {/* Player list */}
           <div className="bg-[#1C1C1C] rounded-2xl border border-[#2E2E2E] overflow-hidden">
             {players.length === 0 ? (
               <p className="text-[#9A9A9A] text-sm text-center py-6">Noch keine Spieler</p>
@@ -172,16 +150,6 @@ export default function EinstellungenPage() {
               ))
             )}
           </div>
-        </div>
-
-        {/* Logout */}
-        <div className="pt-2">
-          <button
-            onClick={handleLogout}
-            className="w-full bg-[#242424] border border-[#2E2E2E] text-[#EF4444] font-semibold rounded-xl py-3 transition-colors hover:bg-[#EF4444]/10"
-          >
-            Abmelden
-          </button>
         </div>
       </div>
     </div>

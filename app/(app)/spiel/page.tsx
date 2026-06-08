@@ -67,15 +67,8 @@ export default function SpielPage() {
       .order('name')
     setAllPlayers(players || [])
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: settings } = await supabase
-        .from('app_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-      if (settings) setDefaultStake(settings.default_stake)
-    }
+    const saved = localStorage.getItem('schnauz_default_stake')
+    if (saved) setDefaultStake(parseInt(saved))
   }
 
   async function loadSessionBalances() {
