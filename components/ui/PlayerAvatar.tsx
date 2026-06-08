@@ -34,14 +34,14 @@ export default function PlayerAvatar({ name, avatarUrl, size = 48, eliminated, i
     <div
       className={`relative rounded-full flex items-center justify-center font-semibold text-white overflow-hidden transition-all duration-200
         ${eliminated ? 'opacity-30 grayscale' : ''}
-        ${isWinner ? 'ring-[3px] ring-[#6366F1] ring-offset-2 ring-offset-[#0B0E14]' : ''}
+        ${isWinner ? 'ring-[3px] ring-[#2E6B3A] ring-offset-2 ring-offset-[#F4ECDA]' : ''}
       `}
       style={{
         width: size,
         height: size,
         fontSize: size * 0.36,
-        background: avatarUrl ? '#1B2230' : `linear-gradient(135deg, ${c1}, ${c2})`,
-        boxShadow: isWinner ? '0 0 22px rgba(99,102,241,0.55)' : undefined,
+        background: avatarUrl ? '#FFFDF7' : `linear-gradient(135deg, ${c1}, ${c2})`,
+        boxShadow: isWinner ? '0 0 22px rgba(46,107,58,0.45)' : undefined,
       }}
     >
       {avatarUrl ? (

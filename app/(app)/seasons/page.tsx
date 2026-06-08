@@ -179,7 +179,7 @@ export default function SeasonsPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[60vh] text-[#8B95A7]">Laden...</div>
+    return <div className="flex items-center justify-center min-h-[60vh] text-[#7C7461]">Laden...</div>
   }
 
   // ---------- Detail view ----------
@@ -189,17 +189,17 @@ export default function SeasonsPage() {
         <div className="flex items-center gap-2 px-3 pt-5 pb-3">
           <button
             onClick={() => setDetailSeason(null)}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#1B2230] text-[#F1F5F9] text-2xl transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#23201A] text-2xl transition-colors"
           >
             ‹
           </button>
-          <h1 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#F1F5F9] flex-1 tracking-tight">
+          <h1 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#23201A] flex-1 tracking-tight">
             {detailSeason.name}
           </h1>
           <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
             detailSeason.status === 'active'
-              ? 'bg-[#34D399]/15 text-[#34D399]'
-              : 'bg-[#2A3344] text-[#8B95A7]'
+              ? 'bg-[#1F9D57]/15 text-[#1F9D57]'
+              : 'bg-[#E4D9BF] text-[#7C7461]'
           }`}>
             {detailSeason.status === 'active' ? 'Aktiv' : 'Abgeschlossen'}
           </span>
@@ -208,14 +208,14 @@ export default function SeasonsPage() {
         <div className="px-4 py-2 space-y-6">
           {/* Balances */}
           <div>
-            <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">Saisonbilanz</p>
-            <div className="bg-[#141925] rounded-2xl border border-[#2A3344] overflow-hidden">
+            <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Saisonbilanz</p>
+            <div className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
               {seasonBalances.length === 0 ? (
-                <p className="text-[#8B95A7] text-sm text-center py-6">Noch keine Daten</p>
+                <p className="text-[#7C7461] text-sm text-center py-6">Noch keine Daten</p>
               ) : (
                 seasonBalances.map(b => (
-                  <div key={b.player.id} className="flex items-center justify-between px-4 py-3 border-b border-[#2A3344] last:border-0">
-                    <span className="text-[#F1F5F9]">{b.player.name}</span>
+                  <div key={b.player.id} className="flex items-center justify-between px-4 py-3 border-b border-[#E4D9BF] last:border-0">
+                    <span className="text-[#23201A]">{b.player.name}</span>
                     <span className={`font-semibold ${getBalanceColor(b.total)}`}>{formatBalance(b.total)}</span>
                   </div>
                 ))
@@ -226,16 +226,16 @@ export default function SeasonsPage() {
           {/* Settlements */}
           {detailSeason.status === 'completed' && settlements.length > 0 && (
             <div>
-              <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">Auszahlungsübersicht</p>
-              <div className="bg-[#141925] rounded-2xl border border-[#2A3344] overflow-hidden">
+              <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Auszahlungsübersicht</p>
+              <div className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
                 {settlements.map((s, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-[#2A3344] last:border-0">
-                    <span className="text-[#F1F5F9] text-sm">
-                      <span className="text-[#F87171]">{s.from.name}</span>
+                  <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-[#E4D9BF] last:border-0">
+                    <span className="text-[#23201A] text-sm">
+                      <span className="text-[#C8443B]">{s.from.name}</span>
                       {' → '}
-                      <span className="text-[#34D399]">{s.to.name}</span>
+                      <span className="text-[#1F9D57]">{s.to.name}</span>
                     </span>
-                    <span className="text-[#6366F1] font-bold">{s.amount} €</span>
+                    <span className="text-[#2E6B3A] font-bold">{s.amount} €</span>
                   </div>
                 ))}
               </div>
@@ -244,51 +244,51 @@ export default function SeasonsPage() {
 
           {/* Sessions & Rounds */}
           <div>
-            <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">Sessions & Runden</p>
+            <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Sessions & Runden</p>
             <div className="space-y-3">
               {sessionsData.length === 0 ? (
-                <p className="text-[#8B95A7] text-sm text-center py-4">Keine Sessions</p>
+                <p className="text-[#7C7461] text-sm text-center py-4">Keine Sessions</p>
               ) : (
                 sessionsData.map(({ session, rounds }, idx) => (
-                  <div key={session.id} className="bg-[#141925] rounded-2xl border border-[#2A3344] overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#1B2230] border-b border-[#2A3344]">
+                  <div key={session.id} className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#FFFDF7] border-b border-[#E4D9BF]">
                       <div>
-                        <span className="text-[#F1F5F9] text-sm font-semibold">Session {idx + 1}</span>
-                        <span className="text-[#8B95A7] text-xs ml-2">
+                        <span className="text-[#23201A] text-sm font-semibold">Session {idx + 1}</span>
+                        <span className="text-[#7C7461] text-xs ml-2">
                           {new Date(session.started_at).toLocaleDateString('de-DE')}
                           {session.status === 'active' && ' · läuft'}
                         </span>
                       </div>
                       <button
                         onClick={() => deleteSession(session)}
-                        className="text-[#F87171] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#F87171]/10"
+                        className="text-[#C8443B] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#C8443B]/10"
                       >
                         Löschen
                       </button>
                     </div>
                     {rounds.length === 0 ? (
-                      <p className="text-[#8B95A7] text-xs text-center py-3">Keine Runden</p>
+                      <p className="text-[#7C7461] text-xs text-center py-3">Keine Runden</p>
                     ) : (
                       rounds.map(r => (
-                        <div key={r.id} className="flex items-center justify-between px-4 py-2.5 border-b border-[#2A3344] last:border-0">
+                        <div key={r.id} className="flex items-center justify-between px-4 py-2.5 border-b border-[#E4D9BF] last:border-0">
                           <div className="flex-1 min-w-0">
-                            <span className="text-[#F1F5F9] text-sm">
+                            <span className="text-[#23201A] text-sm">
                               {r.round_number === 0 ? 'Saldovortrag' : `Runde ${r.round_number}`}
                             </span>
                             {r.round_number > 0 && (
-                              <span className="text-[#8B95A7] text-xs ml-2">{r.stake} €</span>
+                              <span className="text-[#7C7461] text-xs ml-2">{r.stake} €</span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => setEditingRound(r)}
-                              className="text-[#6366F1] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#6366F1]/10"
+                              className="text-[#2E6B3A] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#2E6B3A]/10"
                             >
                               Bearbeiten
                             </button>
                             <button
                               onClick={() => deleteRound(r)}
-                              className="text-[#F87171] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#F87171]/10"
+                              className="text-[#C8443B] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#C8443B]/10"
                             >
                               Löschen
                             </button>
@@ -304,18 +304,18 @@ export default function SeasonsPage() {
 
           {/* Season status */}
           <div>
-            <p className="text-[#8B95A7] text-xs uppercase tracking-wider mb-3 font-medium">Status</p>
+            <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Status</p>
             {detailSeason.status === 'active' ? (
               <button
                 onClick={() => setSeasonStatus(detailSeason, 'completed')}
-                className="w-full bg-[#141925] border border-[#F87171]/40 text-[#F87171] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#F87171]/5"
+                className="w-full bg-[#FBF6EA] border border-[#C8443B]/40 text-[#C8443B] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#C8443B]/5"
               >
                 Season abschließen
               </button>
             ) : (
               <button
                 onClick={() => setSeasonStatus(detailSeason, 'active')}
-                className="w-full bg-[#141925] border border-[#34D399]/40 text-[#34D399] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#34D399]/5"
+                className="w-full bg-[#FBF6EA] border border-[#1F9D57]/40 text-[#1F9D57] font-semibold rounded-2xl py-3.5 transition-colors hover:bg-[#1F9D57]/5"
               >
                 Season wieder aktivieren
               </button>
@@ -338,37 +338,37 @@ export default function SeasonsPage() {
   return (
     <div className="flex flex-col max-w-md mx-auto w-full">
       <div className="flex items-center justify-between px-4 pt-6 pb-4">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#F1F5F9] tracking-tight">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] tracking-tight">
           Seasons
         </h1>
         <button
           onClick={() => setShowNewForm(true)}
-          className="bg-[#6366F1] hover:bg-[#818CF8] text-white font-semibold rounded-xl px-4 py-2 text-sm transition-colors"
+          className="bg-[#2E6B3A] hover:bg-[#3A8049] text-white font-semibold rounded-xl px-4 py-2 text-sm transition-colors"
         >
           + Neu
         </button>
       </div>
 
       {showNewForm && (
-        <div className="mx-4 mb-4 bg-[#141925] rounded-2xl border border-[#6366F1]/40 p-4 space-y-3 animate-pop-in">
-          <h2 className="font-semibold text-[#F1F5F9]">Neue Season</h2>
+        <div className="mx-4 mb-4 bg-[#FBF6EA] rounded-2xl border border-[#2E6B3A]/40 p-4 space-y-3 animate-pop-in">
+          <h2 className="font-semibold text-[#23201A]">Neue Season</h2>
           <input
             value={newName}
             onChange={e => setNewName(e.target.value)}
             placeholder="Name (z.B. Season 3)"
-            className="w-full bg-[#0B0E14] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] text-sm outline-none focus:border-[#6366F1]"
+            className="w-full bg-[#F4ECDA] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
           />
           <input
             type="date"
             value={newStartDate}
             onChange={e => setNewStartDate(e.target.value)}
-            className="w-full bg-[#0B0E14] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] text-sm outline-none focus:border-[#6366F1]"
+            className="w-full bg-[#F4ECDA] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
           />
           <div className="flex gap-2">
-            <button onClick={() => setShowNewForm(false)} className="flex-1 bg-[#1B2230] text-[#8B95A7] font-medium rounded-xl py-3 text-sm">
+            <button onClick={() => setShowNewForm(false)} className="flex-1 bg-[#FFFDF7] text-[#7C7461] font-medium rounded-xl py-3 text-sm">
               Abbrechen
             </button>
-            <button onClick={createSeason} disabled={!newName} className="flex-1 bg-[#6366F1] disabled:opacity-50 text-white font-semibold rounded-xl py-3 text-sm">
+            <button onClick={createSeason} disabled={!newName} className="flex-1 bg-[#2E6B3A] disabled:opacity-50 text-white font-semibold rounded-xl py-3 text-sm">
               Anlegen
             </button>
           </div>
@@ -377,23 +377,23 @@ export default function SeasonsPage() {
 
       <div className="px-4 pb-6 space-y-3">
         {seasons.length === 0 ? (
-          <div className="text-center text-[#8B95A7] py-10">Noch keine Seasons vorhanden.</div>
+          <div className="text-center text-[#7C7461] py-10">Noch keine Seasons vorhanden.</div>
         ) : (
           seasons.map(s => (
             <button
               key={s.id}
               onClick={() => loadSeasonDetail(s)}
-              className="w-full text-left bg-[#141925] rounded-2xl border border-[#2A3344] p-4 hover:border-[#6366F1]/50 transition-colors"
+              className="w-full text-left bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] p-4 hover:border-[#2E6B3A]/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-[#F1F5F9]">{s.name}</span>
+                <span className="font-semibold text-[#23201A]">{s.name}</span>
                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-                  s.status === 'active' ? 'bg-[#34D399]/15 text-[#34D399]' : 'bg-[#2A3344] text-[#8B95A7]'
+                  s.status === 'active' ? 'bg-[#1F9D57]/15 text-[#1F9D57]' : 'bg-[#E4D9BF] text-[#7C7461]'
                 }`}>
                   {s.status === 'active' ? 'Aktiv' : 'Fertig'}
                 </span>
               </div>
-              <div className="flex gap-3 text-[#8B95A7] text-xs">
+              <div className="flex gap-3 text-[#7C7461] text-xs">
                 <span>{s.roundCount} Runden</span>
                 {s.avgStake > 0 && <span>Ø {s.avgStake} €</span>}
                 {s.end_date && <span>bis {new Date(s.end_date).toLocaleDateString('de-DE')}</span>}
@@ -467,32 +467,32 @@ function RoundEditor({
     <Portal>
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
       <div
-        className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[85vh] flex flex-col animate-pop-in"
+        className="w-full max-w-md mx-auto bg-[#FBF6EA] rounded-t-3xl border-t border-[#E4D9BF] max-h-[85vh] flex flex-col animate-pop-in"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
-          <h2 className="font-[family-name:var(--font-display)] font-bold text-[#F1F5F9]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E4D9BF]">
+          <h2 className="font-[family-name:var(--font-display)] font-bold text-[#23201A]">
             {isCarryOver ? 'Saldovortrag bearbeiten' : `Runde ${round.round_number} bearbeiten`}
           </h2>
-          <button onClick={onClose} className="text-[#8B95A7] text-2xl leading-none w-8 h-8">×</button>
+          <button onClick={onClose} className="text-[#7C7461] text-2xl leading-none w-8 h-8">×</button>
         </div>
 
         {loading ? (
-          <div className="text-center text-[#8B95A7] py-10">Laden...</div>
+          <div className="text-center text-[#7C7461] py-10">Laden...</div>
         ) : (
           <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
             {isCarryOver ? (
               <>
-                <p className="text-[#8B95A7] text-xs">Bilanz pro Spieler (€)</p>
+                <p className="text-[#7C7461] text-xs">Bilanz pro Spieler (€)</p>
                 {participants.map(rp => (
                   <div key={rp.id} className="flex items-center justify-between gap-3">
-                    <span className="text-[#F1F5F9] text-sm">{rp.player?.name}</span>
+                    <span className="text-[#23201A] text-sm">{rp.player?.name}</span>
                     <input
                       type="number"
                       step="1"
                       value={balances[rp.player_id] ?? '0'}
                       onChange={e => setBalances(b => ({ ...b, [rp.player_id]: e.target.value }))}
-                      className="w-24 bg-[#1B2230] border border-[#2A3344] rounded-xl px-3 py-2 text-[#F1F5F9] text-sm outline-none focus:border-[#6366F1] text-right"
+                      className="w-24 bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-3 py-2 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A] text-right"
                     />
                   </div>
                 ))}
@@ -500,18 +500,18 @@ function RoundEditor({
             ) : (
               <>
                 <div>
-                  <label className="block text-[#8B95A7] text-xs uppercase tracking-wider mb-2 font-medium">Einsatz (€)</label>
+                  <label className="block text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">Einsatz (€)</label>
                   <input
                     type="number"
                     min="0"
                     step="1"
                     value={stake}
                     onChange={e => setStake(e.target.value)}
-                    className="w-full bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                    className="w-full bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] outline-none focus:border-[#2E6B3A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[#8B95A7] text-xs uppercase tracking-wider mb-2 font-medium">Gewinner</label>
+                  <label className="block text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">Gewinner</label>
                   <div className="space-y-1.5">
                     {participants.map(rp => (
                       <button
@@ -519,12 +519,12 @@ function RoundEditor({
                         onClick={() => setWinnerId(rp.player_id)}
                         className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-colors ${
                           winnerId === rp.player_id
-                            ? 'border-[#6366F1] bg-[#6366F1]/10 text-[#F1F5F9]'
-                            : 'border-[#2A3344] bg-[#1B2230] text-[#8B95A7]'
+                            ? 'border-[#2E6B3A] bg-[#2E6B3A]/10 text-[#23201A]'
+                            : 'border-[#E4D9BF] bg-[#FFFDF7] text-[#7C7461]'
                         }`}
                       >
                         <span>{rp.player?.name}</span>
-                        {winnerId === rp.player_id && <span className="text-[#6366F1]">👑</span>}
+                        {winnerId === rp.player_id && <span className="text-[#2E6B3A]">👑</span>}
                       </button>
                     ))}
                   </div>
@@ -534,11 +534,11 @@ function RoundEditor({
           </div>
         )}
 
-        <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#2A3344]">
+        <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#E4D9BF]">
           <button
             onClick={save}
             disabled={saving || loading}
-            className="w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 transition-colors"
+            className="w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 transition-colors"
           >
             {saving ? 'Speichern...' : 'Speichern'}
           </button>

@@ -4,8 +4,8 @@
   "description": "Schnauz Runden-Tracker für den Stammtisch",
   "start_url": "/spiel",
   "display": "standalone",
-  "background_color": "#0B0E14",
-  "theme_color": "#0B0E14",
+  "background_color": "#F4ECDA",
+  "theme_color": "#F4ECDA",
   "orientation": "portrait",
   "icons": [
     {

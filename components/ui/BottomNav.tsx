@@ -4,14 +4,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 type IconProps = { active: boolean }
-const stroke = (a: boolean) => (a ? '#6366F1' : '#8B95A7')
+const stroke = (a: boolean) => (a ? '#2E6B3A' : '#7C7461')
 
 function CardIcon({ active }: IconProps) {
   const c = stroke(active)
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <rect x="9.5" y="5" width="11" height="15" rx="2.5" stroke={c} strokeWidth="1.7" fill={active ? '#6366F1' : 'none'} fillOpacity={active ? 0.12 : 0} transform="rotate(8 15 12)" />
-      <rect x="3.5" y="4" width="11" height="15" rx="2.5" stroke={c} strokeWidth="1.7" fill={active ? '#6366F1' : 'none'} fillOpacity={active ? 0.18 : 0} transform="rotate(-8 9 11)" />
+      <rect x="9.5" y="5" width="11" height="15" rx="2.5" stroke={c} strokeWidth="1.7" fill={active ? '#2E6B3A' : 'none'} fillOpacity={active ? 0.12 : 0} transform="rotate(8 15 12)" />
+      <rect x="3.5" y="4" width="11" height="15" rx="2.5" stroke={c} strokeWidth="1.7" fill={active ? '#2E6B3A' : 'none'} fillOpacity={active ? 0.18 : 0} transform="rotate(-8 9 11)" />
       <path d="M9 9.2c-1.1-1.4-3-.5-3 .9 0 1.2 1.7 2.3 3 3.1 1.3-.8 3-1.9 3-3.1 0-1.4-1.9-2.3-3-.9z" fill={c} />
     </svg>
   )
@@ -21,7 +21,7 @@ function PeopleIcon({ active }: IconProps) {
   const c = stroke(active)
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <circle cx="9" cy="8" r="3.2" stroke={c} strokeWidth="1.7" fill={active ? '#6366F1' : 'none'} fillOpacity={active ? 0.15 : 0} />
+      <circle cx="9" cy="8" r="3.2" stroke={c} strokeWidth="1.7" fill={active ? '#2E6B3A' : 'none'} fillOpacity={active ? 0.15 : 0} />
       <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke={c} strokeWidth="1.7" strokeLinecap="round" />
       <path d="M16 6.2a2.8 2.8 0 010 5.2M17.5 19c0-2.3-1-4-2.5-4.7" stroke={c} strokeWidth="1.7" strokeLinecap="round" />
     </svg>
@@ -44,7 +44,7 @@ function TrophyIcon({ active }: IconProps) {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
       <path d="M8 21h8M12 17v4M7 4H5a2 2 0 000 4c.3 1.7 1.5 3.2 3 3.7M17 4h2a2 2 0 010 4c-.3 1.7-1.5 3.2-3 3.7" stroke={c} strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M7 3.5h10V9a5 5 0 01-10 0V3.5z" stroke={c} strokeWidth="1.7" fill={active ? '#6366F1' : 'none'} fillOpacity={active ? 0.15 : 0} strokeLinejoin="round" />
+      <path d="M7 3.5h10V9a5 5 0 01-10 0V3.5z" stroke={c} strokeWidth="1.7" fill={active ? '#2E6B3A' : 'none'} fillOpacity={active ? 0.15 : 0} strokeLinejoin="round" />
     </svg>
   )
 }
@@ -60,7 +60,7 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#141925]/95 backdrop-blur-lg border-t border-[#2A3344] pb-safe z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#FBF6EA]/95 backdrop-blur-lg border-t border-[#E4D9BF] pb-safe z-50">
       <div className="flex max-w-md mx-auto">
         {tabs.map(({ href, label, Icon }) => {
           const active = pathname.startsWith(href)
@@ -72,14 +72,14 @@ export default function BottomNav() {
             >
               <div
                 className={`w-14 h-9 rounded-full flex items-center justify-center transition-colors duration-200 ${
-                  active ? 'bg-[#6366F1]/15' : 'bg-transparent'
+                  active ? 'bg-[#2E6B3A]/15' : 'bg-transparent'
                 }`}
               >
                 <Icon active={active} />
               </div>
               <span
                 className={`text-[11px] font-semibold tracking-wide leading-none transition-colors ${
-                  active ? 'text-[#6366F1]' : 'text-[#8B95A7]'
+                  active ? 'text-[#2E6B3A]' : 'text-[#7C7461]'
                 }`}
               >
                 {label}

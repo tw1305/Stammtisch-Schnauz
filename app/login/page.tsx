@@ -29,18 +29,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center bg-[#0B0E14] px-6">
+    <div className="min-h-dvh flex flex-col items-center justify-center bg-[#F4ECDA] px-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-[#6366F1] mb-2">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold text-[#2E6B3A] mb-2">
             Schnauz
           </h1>
-          <p className="text-[#8B95A7] text-sm">Stammtisch Tracker</p>
+          <p className="text-[#7C7461] text-sm">Stammtisch Tracker</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm text-[#8B95A7] mb-1.5" htmlFor="email">
+            <label className="block text-sm text-[#7C7461] mb-1.5" htmlFor="email">
               E-Mail
             </label>
             <input
@@ -50,13 +50,13 @@ export default function LoginPage() {
               onChange={e => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full bg-[#141925] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] placeholder-[#8B95A7] outline-none focus:border-[#6366F1] transition-colors"
+              className="w-full bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] placeholder-[#7C7461] outline-none focus:border-[#2E6B3A] transition-colors"
               placeholder="name@beispiel.de"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-[#8B95A7] mb-1.5" htmlFor="password">
+            <label className="block text-sm text-[#7C7461] mb-1.5" htmlFor="password">
               Passwort
             </label>
             <input
@@ -66,19 +66,19 @@ export default function LoginPage() {
               onChange={e => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full bg-[#141925] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] placeholder-[#8B95A7] outline-none focus:border-[#6366F1] transition-colors"
+              className="w-full bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] placeholder-[#7C7461] outline-none focus:border-[#2E6B3A] transition-colors"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p className="text-[#F87171] text-sm text-center">{error}</p>
+            <p className="text-[#C8443B] text-sm text-center">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-xl py-3 transition-colors mt-2"
+            className="w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-xl py-3 transition-colors mt-2"
           >
             {loading ? 'Anmelden...' : 'Anmelden'}
           </button>

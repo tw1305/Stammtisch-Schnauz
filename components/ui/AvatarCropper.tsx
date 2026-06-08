@@ -74,7 +74,7 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
     canvas.width = OUT
     canvas.height = OUT
     const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#1B2230'
+    ctx.fillStyle = '#FFFDF7'
     ctx.fillRect(0, 0, OUT, OUT)
     const k = OUT / FRAME
     try {
@@ -88,12 +88,12 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
   return (
     <Portal>
       <div className="fixed inset-0 bg-black/90 z-[110] flex flex-col items-center justify-center px-6 animate-fade-in">
-        <p className="text-[#F1F5F9] font-[family-name:var(--font-display)] font-bold text-lg mb-5">
+        <p className="text-[#F4ECDA] font-[family-name:var(--font-display)] font-bold text-xl mb-5">
           Bild ausrichten
         </p>
 
         <div
-          className="relative rounded-full overflow-hidden border-2 border-[#6366F1] touch-none select-none bg-[#1B2230]"
+          className="relative rounded-full overflow-hidden border-2 border-[#2E6B3A] touch-none select-none bg-[#FFFDF7]"
           style={{ width: FRAME, height: FRAME }}
           onPointerDown={onDown}
           onPointerMove={onMove}
@@ -113,7 +113,7 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
         </div>
 
         <div className="w-full max-w-xs mt-6 flex items-center gap-3">
-          <span className="text-[#8B95A7] text-xs">−</span>
+          <span className="text-[#D8CDB4] text-xs">−</span>
           <input
             type="range"
             min="1"
@@ -121,23 +121,23 @@ export default function AvatarCropper({ src, onCancel, onConfirm }: Props) {
             step="0.01"
             value={zoom}
             onChange={e => setZoom(parseFloat(e.target.value))}
-            className="flex-1 accent-[#6366F1]"
+            className="flex-1 accent-[#5BA46A]"
           />
-          <span className="text-[#8B95A7] text-xs">+</span>
+          <span className="text-[#D8CDB4] text-xs">+</span>
         </div>
-        <p className="text-[#8B95A7] text-xs mt-3">Ziehen zum Verschieben · Regler zum Zoomen</p>
+        <p className="text-[#D8CDB4] text-xs mt-3">Ziehen zum Verschieben · Regler zum Zoomen</p>
 
         <div className="flex gap-3 mt-7 w-full max-w-xs pb-[env(safe-area-inset-bottom)]">
           <button
             onClick={onCancel}
-            className="flex-1 bg-[#1B2230] text-[#8B95A7] font-medium rounded-2xl py-3"
+            className="flex-1 bg-[#FFFDF7] text-[#23201A] font-medium rounded-2xl py-3"
           >
             Abbrechen
           </button>
           <button
             onClick={confirm}
             disabled={!nat}
-            className="flex-1 bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-2xl py-3"
+            className="flex-1 bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-2xl py-3"
           >
             Übernehmen
           </button>

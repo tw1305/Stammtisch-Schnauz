@@ -40,16 +40,16 @@ export default function SpielerPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[60vh] text-[#8B95A7]">Laden...</div>
+    return <div className="flex items-center justify-center min-h-[60vh] text-[#7C7461]">Laden...</div>
   }
 
   return (
     <div className="flex flex-col max-w-md mx-auto w-full">
       <div className="px-4 pt-6 pb-4">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#F1F5F9] tracking-tight">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] tracking-tight">
           Spieler
         </h1>
-        <p className="text-[#8B95A7] text-sm mt-1">Profile & Bilder verwalten</p>
+        <p className="text-[#7C7461] text-sm mt-1">Profile & Bilder verwalten</p>
       </div>
 
       {/* Add new player */}
@@ -60,12 +60,12 @@ export default function SpielerPage() {
             onChange={e => setNewPlayerName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addPlayer()}
             placeholder="Neuen Spieler anlegen..."
-            className="flex-1 bg-[#141925] border border-[#2A3344] rounded-2xl px-4 py-3 text-[#F1F5F9] text-sm outline-none focus:border-[#6366F1] transition-colors"
+            className="flex-1 bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-3 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A] transition-colors"
           />
           <button
             onClick={addPlayer}
             disabled={!newPlayerName.trim()}
-            className="bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-40 text-white font-semibold rounded-2xl px-5 text-sm transition-colors"
+            className="bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-40 text-white font-semibold rounded-2xl px-5 text-sm transition-colors"
           >
             Anlegen
           </button>
@@ -78,18 +78,18 @@ export default function SpielerPage() {
           <button
             key={p.id}
             onClick={() => setEditing(p)}
-            className="w-full flex items-center gap-3.5 bg-[#141925] border border-[#2A3344] rounded-2xl px-4 py-3 hover:border-[#6366F1]/50 transition-colors text-left"
+            className="w-full flex items-center gap-3.5 bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-3 hover:border-[#2E6B3A]/50 transition-colors text-left"
           >
             <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={48} eliminated={!p.is_active} />
             <div className="flex-1 min-w-0">
-              <p className={`font-semibold truncate ${p.is_active ? 'text-[#F1F5F9]' : 'text-[#8B95A7] line-through'}`}>
+              <p className={`font-semibold truncate ${p.is_active ? 'text-[#23201A]' : 'text-[#7C7461] line-through'}`}>
                 {p.name}
               </p>
-              <p className="text-[#8B95A7] text-xs mt-0.5">
+              <p className="text-[#7C7461] text-xs mt-0.5">
                 {p.is_active ? 'Aktiv' : 'Inaktiv'} · Zum Bearbeiten tippen
               </p>
             </div>
-            <span className="text-[#8B95A7] text-lg">›</span>
+            <span className="text-[#7C7461] text-lg">›</span>
           </button>
         ))}
       </div>
@@ -149,12 +149,12 @@ function PlayerEditor({
     <Portal>
       <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
         <div
-          className="w-full max-w-md mx-auto bg-[#141925] rounded-t-3xl border-t border-[#2A3344] max-h-[90vh] overflow-y-auto animate-pop-in"
+          className="w-full max-w-md mx-auto bg-[#FBF6EA] rounded-t-3xl border-t border-[#E4D9BF] max-h-[90vh] overflow-y-auto animate-pop-in"
           onClick={e => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3344]">
-            <h2 className="font-[family-name:var(--font-display)] font-bold text-lg text-[#F1F5F9]">Profil bearbeiten</h2>
-            <button onClick={onClose} className="text-[#8B95A7] text-2xl leading-none w-8 h-8">×</button>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#E4D9BF]">
+            <h2 className="font-[family-name:var(--font-display)] font-bold text-lg text-[#23201A]">Profil bearbeiten</h2>
+            <button onClick={onClose} className="text-[#7C7461] text-2xl leading-none w-8 h-8">×</button>
           </div>
 
           <div className="px-5 py-5 space-y-5">
@@ -170,7 +170,7 @@ function PlayerEditor({
               <div className="flex gap-2 flex-wrap justify-center">
                 <button
                   onClick={() => fileRef.current?.click()}
-                  className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F1F5F9] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                  className="bg-[#FFFDF7] hover:bg-[#E4D9BF] text-[#23201A] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
                 >
                   📷 Bild wählen
                 </button>
@@ -178,13 +178,13 @@ function PlayerEditor({
                   <>
                     <button
                       onClick={() => setCropSrc(avatarUrl)}
-                      className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F1F5F9] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                      className="bg-[#FFFDF7] hover:bg-[#E4D9BF] text-[#23201A] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
                     >
                       ✂️ Ausrichten
                     </button>
                     <button
                       onClick={() => setAvatarUrl(null)}
-                      className="bg-[#1B2230] hover:bg-[#2A3344] text-[#F87171] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
+                      className="bg-[#FFFDF7] hover:bg-[#E4D9BF] text-[#C8443B] text-sm font-medium rounded-xl px-4 py-2 transition-colors"
                     >
                       Entfernen
                     </button>
@@ -196,21 +196,21 @@ function PlayerEditor({
 
             {/* Name */}
             <div>
-              <label className="block text-[#8B95A7] text-xs uppercase tracking-wider mb-2 font-medium">Anzeigename</label>
+              <label className="block text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">Anzeigename</label>
               <input
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3 text-[#F1F5F9] outline-none focus:border-[#6366F1] transition-colors"
+                className="w-full bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] outline-none focus:border-[#2E6B3A] transition-colors"
               />
             </div>
 
             {/* Active toggle */}
             <button
               onClick={() => setIsActive(v => !v)}
-              className="w-full flex items-center justify-between bg-[#1B2230] border border-[#2A3344] rounded-xl px-4 py-3"
+              className="w-full flex items-center justify-between bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-4 py-3"
             >
-              <span className="text-[#F1F5F9] text-sm">Aktiv (spielt mit)</span>
-              <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${isActive ? 'bg-[#6366F1]' : 'bg-[#2A3344]'}`}>
+              <span className="text-[#23201A] text-sm">Aktiv (spielt mit)</span>
+              <span className={`w-11 h-6 rounded-full p-0.5 transition-colors ${isActive ? 'bg-[#2E6B3A]' : 'bg-[#E4D9BF]'}`}>
                 <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${isActive ? 'translate-x-5' : ''}`} />
               </span>
             </button>
@@ -220,7 +220,7 @@ function PlayerEditor({
             <button
               onClick={save}
               disabled={saving || !name.trim()}
-              className="w-full bg-[#6366F1] hover:bg-[#818CF8] disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 transition-colors"
+              className="w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-2xl py-3.5 transition-colors"
             >
               {saving ? 'Speichern...' : 'Speichern'}
             </button>

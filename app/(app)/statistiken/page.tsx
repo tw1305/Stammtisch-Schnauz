@@ -141,13 +141,13 @@ export default function StatistikenPage() {
     <div className="flex flex-col max-w-md mx-auto w-full">
       {/* Header */}
       <div className="px-4 pt-6 pb-4">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#F1F5F9] mb-3 tracking-tight">
+        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] mb-3 tracking-tight">
           Statistiken
         </h1>
         <select
           value={selectedSeasonId}
           onChange={e => setSelectedSeasonId(e.target.value)}
-          className="w-full bg-[#141925] border border-[#2A3344] rounded-2xl px-4 py-3 text-[#F1F5F9] text-sm outline-none focus:border-[#6366F1]"
+          className="w-full bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-3 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
         >
           <option value="all">Alle Seasons</option>
           {seasons.map(s => (
@@ -159,42 +159,42 @@ export default function StatistikenPage() {
       {/* Stats */}
       <div className="px-4 py-4 space-y-2.5">
         {loading ? (
-          <div className="text-center text-[#8B95A7] py-10">Laden...</div>
+          <div className="text-center text-[#7C7461] py-10">Laden...</div>
         ) : stats.length === 0 ? (
-          <div className="text-center text-[#8B95A7] py-10">Noch keine Statistiken vorhanden.</div>
+          <div className="text-center text-[#7C7461] py-10">Noch keine Statistiken vorhanden.</div>
         ) : (
           stats.map((s, i) => {
             const isOpen = expanded.has(s.player.id)
             return (
-              <div key={s.player.id} className="bg-[#141925] rounded-2xl border border-[#2A3344] overflow-hidden">
+              <div key={s.player.id} className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
                 {/* Collapsed header — tap to expand */}
                 <button
                   onClick={() => toggle(s.player.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
-                    isOpen ? 'bg-[#1B2230]' : 'hover:bg-[#1B2230]/60'
+                    isOpen ? 'bg-[#FFFDF7]' : 'hover:bg-[#FFFDF7]/60'
                   }`}
                 >
-                  <div className="w-8 h-8 rounded-full bg-[#6366F1] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#2E6B3A] flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {i + 1}
                   </div>
-                  <span className="font-semibold text-[#F1F5F9] flex-1 truncate">{s.player.name}</span>
+                  <span className="font-semibold text-[#23201A] flex-1 truncate">{s.player.name}</span>
                   <span className={`font-bold text-lg ${getBalanceColor(s.total_balance)}`}>
                     {formatBalance(s.total_balance)}
                   </span>
-                  <span className={`text-[#8B95A7] text-sm transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                  <span className={`text-[#7C7461] text-sm transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
                     ⌄
                   </span>
                 </button>
 
                 {/* Details — only when expanded */}
                 {isOpen && (
-                  <div className="border-t border-[#2A3344] animate-fade-in">
-                    <div className="grid grid-cols-3 divide-x divide-[#2A3344]">
+                  <div className="border-t border-[#E4D9BF] animate-fade-in">
+                    <div className="grid grid-cols-3 divide-x divide-[#E4D9BF]">
                       <StatCell icon="🏆" label="Siege" value={s.wins} />
                       <StatCell icon="💀" label="1. Aus" value={s.first_eliminations} />
                       <StatCell icon="💉" label="Revivals" value={s.revivals} />
                     </div>
-                    <div className="grid grid-cols-3 divide-x divide-[#2A3344] border-t border-[#2A3344]">
+                    <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="⚔️" label="Finals" value={s.final_appearances} />
                       <StatCell icon="🔥" label="Streak" value={s.win_streak} highlight={s.win_streak >= 3} />
                       <div className="flex flex-col items-center justify-center py-3">
@@ -202,7 +202,7 @@ export default function StatistikenPage() {
                         <span className={`text-sm font-bold ${getBalanceColor(s.total_balance)}`}>
                           {formatBalance(s.total_balance)}
                         </span>
-                        <span className="text-[10px] text-[#8B95A7] mt-0.5">Gesamt</span>
+                        <span className="text-[10px] text-[#7C7461] mt-0.5">Gesamt</span>
                       </div>
                     </div>
                   </div>
@@ -230,10 +230,10 @@ function StatCell({
   return (
     <div className="flex flex-col items-center justify-center py-3 gap-0.5">
       <span className="text-base">{icon}</span>
-      <span className={`text-lg font-bold ${highlight ? 'text-[#6366F1]' : 'text-[#F1F5F9]'}`}>
+      <span className={`text-lg font-bold ${highlight ? 'text-[#2E6B3A]' : 'text-[#23201A]'}`}>
         {value}
       </span>
-      <span className="text-[10px] text-[#8B95A7]">{label}</span>
+      <span className="text-[10px] text-[#7C7461]">{label}</span>
     </div>
   )
 }

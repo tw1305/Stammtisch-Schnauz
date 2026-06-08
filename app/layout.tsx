@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Sora, Inter } from 'next/font/google'
+import { Playfair_Display, Inter } from 'next/font/google'
 import './globals.css'
 
-const sora = Sora({
+const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-display',
-  weight: ['500', '600', '700', '800'],
+  weight: ['600', '700', '800'],
   display: 'swap',
 })
 
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Schnauz',
   },
 }
@@ -31,7 +31,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#0B0E14',
+  themeColor: '#F4ECDA',
 }
 
 export default function RootLayout({
@@ -40,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="de" className={`${sora.variable} ${inter.variable}`}>
+    <html lang="de" className={`${playfair.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   )
