@@ -74,7 +74,24 @@ export type PlayerStats = {
   revives_given: number
   final_appearances: number
   win_streak: number
+  longest_streak: number
+  rounds_played: number
+  win_rate: number // 0..1
   total_balance: number
+  balance_history: number[] // cumulative balance over completed rounds (chronological)
+}
+
+export type Badge = {
+  icon: string
+  label: string
+  desc: string
+}
+
+export type HeadToHead = {
+  opponent: Player
+  games: number
+  myWins: number
+  theirWins: number
 }
 
 export type DebtSettlement = {

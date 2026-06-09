@@ -1,24 +1,30 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
-import type { Season, Player, PlayerStats } from '@/types/database'
+import { computePlayerStats, deriveBadges } from '@/lib/stats'
+import BalanceSparkline from '@/components/ui/BalanceSparkline'
+import type { Season, PlayerStats, Badge } from '@/types/database'
 
 const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] = [
   { key: 'balance', label: 'Gesamtbilanz', get: s => s.total_balance },
   { key: 'wins', label: 'Siege', get: s => s.wins },
+  { key: 'winrate', label: 'Win-Rate', get: s => s.win_rate },
+  { key: 'played', label: 'Gespielte Runden', get: s => s.rounds_played },
   { key: 'first', label: 'Erste Ausscheidungen', get: s => s.first_eliminations },
   { key: 'revived', label: 'Wiederbelebt', get: s => s.revivals },
   { key: 'given', label: 'Andere belebt', get: s => s.revives_given },
   { key: 'finals', label: 'Finalteilnahmen', get: s => s.final_appearances },
-  { key: 'streak', label: 'Win Streak', get: s => s.win_streak },
+  { key: 'streak', label: 'Aktuelle Serie', get: s => s.win_streak },
+  { key: 'record', label: 'Rekord-Serie', get: s => s.longest_streak },
 ]
 
 function rankColor(i: number): string {
-  if (i === 0) return '#D4AF37' // gold
-  if (i === 1) return '#9CA3AA' // silver
-  if (i === 2) return '#B87333' // bronze
+  if (i === 0) return '#D4AF37'
+  if (i === 1) return '#9CA3AA'
+  if (i === 2) return '#B87333'
   return '#2E6B3A'
 }
 
@@ -53,100 +59,16 @@ export default function StatistikenPage() {
     if (active) setSelectedSeasonId(active.id)
   }
 
-  function emptyStats(player: Player): PlayerStats {
-    return {
-      player,
-      wins: 0,
-      first_eliminations: 0,
-      revivals: 0,
-      revives_given: 0,
-      final_appearances: 0,
-      win_streak: 0,
-      total_balance: 0,
-    }
-  }
-
   async function loadStats() {
     setLoading(true)
-
-    const { data: players } = await supabase
-      .from('players')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
-
-    if (!players || players.length === 0) {
-      setStats([])
-      setLoading(false)
-      return
-    }
-
-    let roundQuery = supabase.from('rounds').select('id, session_id').eq('status', 'completed')
-
-    if (selectedSeasonId !== 'all') {
-      const { data: sessions } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('season_id', selectedSeasonId)
-      const sessionIds = sessions?.map(s => s.id) || []
-      if (sessionIds.length === 0) {
-        setStats(players.map(p => emptyStats(p)))
-        setLoading(false)
-        return
-      }
-      roundQuery = roundQuery.in('session_id', sessionIds)
-    }
-
-    const { data: rounds } = await roundQuery
-    const roundIds = rounds?.map(r => r.id) || []
-
-    if (roundIds.length === 0) {
-      setStats(players.map(p => emptyStats(p)))
-      setLoading(false)
-      return
-    }
-
-    const { data: rps } = await supabase
-      .from('round_players')
-      .select('*')
-      .in('round_id', roundIds)
-
-    const statsMap: Record<string, PlayerStats> = {}
-    for (const p of players) statsMap[p.id] = emptyStats(p)
-
-    for (const rp of rps || []) {
-      const s = statsMap[rp.player_id]
-      if (!s) continue
-      if (rp.is_winner) s.wins++
-      if (rp.was_first_eliminated) s.first_eliminations++
-      if (rp.was_revived) s.revivals++
-      s.revives_given += rp.revives_given ?? 0
-      if (rp.reached_final) s.final_appearances++
-      if (rp.balance_change != null) s.total_balance += rp.balance_change
-    }
-
-    // Win streak: needs ordered rounds
-    const { data: orderedRounds } = await supabase
-      .from('rounds')
-      .select('id, winner_id, started_at')
-      .in('id', roundIds)
-      .order('started_at', { ascending: false })
-
-    for (const p of players) {
-      let streak = 0
-      for (const r of orderedRounds || []) {
-        if (r.winner_id === p.id) streak++
-        else break
-      }
-      statsMap[p.id].win_streak = streak
-    }
-
-    setStats(Object.values(statsMap))
+    const result = await computePlayerStats(supabase, { seasonId: selectedSeasonId })
+    setStats(result)
     setLoading(false)
   }
 
   const sortGet = SORTS.find(x => x.key === sortKey)!.get
   const sorted = [...stats].sort((a, b) => sortGet(b) - sortGet(a) || b.total_balance - a.total_balance)
+  const badges = deriveBadges(stats)
 
   return (
     <div className="flex flex-col max-w-md mx-auto w-full">
@@ -190,13 +112,13 @@ export default function StatistikenPage() {
             const isOpen = expanded.has(s.player.id)
             const medal = rankColor(i)
             const isPodium = i < 3
+            const playerBadges = badges[s.player.id] ?? []
             return (
               <div
                 key={s.player.id}
                 className="bg-[#FBF6EA] rounded-2xl border overflow-hidden"
                 style={{ borderColor: isPodium ? medal : '#E4D9BF' }}
               >
-                {/* Collapsed header — tap to expand */}
                 <button
                   onClick={() => toggle(s.player.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
@@ -209,7 +131,12 @@ export default function StatistikenPage() {
                   >
                     {i + 1}
                   </div>
-                  <span className="font-semibold text-[#23201A] flex-1 truncate">{s.player.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-[#23201A] truncate block">{s.player.name}</span>
+                    {playerBadges.length > 0 && (
+                      <span className="text-xs leading-none">{playerBadges.map(b => b.icon).join(' ')}</span>
+                    )}
+                  </div>
                   <span className={`font-bold text-lg ${getBalanceColor(s.total_balance)}`}>
                     {formatBalance(s.total_balance)}
                   </span>
@@ -218,26 +145,45 @@ export default function StatistikenPage() {
                   </span>
                 </button>
 
-                {/* Details — only when expanded */}
                 {isOpen && (
                   <div className="border-t border-[#E4D9BF] animate-fade-in">
                     <div className="grid grid-cols-3 divide-x divide-[#E4D9BF]">
                       <StatCell icon="🏆" label="Siege" value={s.wins} />
+                      <StatCell icon="🎯" label="Runden" value={s.rounds_played} />
+                      <StatCell icon="📈" label="Win-Rate" value={`${Math.round(s.win_rate * 100)}%`} />
+                    </div>
+                    <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="💀" label="1. Aus" value={s.first_eliminations} />
                       <StatCell icon="⚔️" label="Finals" value={s.final_appearances} />
+                      <StatCell icon="🔥" label="Rekord" value={s.longest_streak} highlight={s.longest_streak >= 3} />
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="💉" label="Wiederbelebt" value={s.revivals} />
                       <StatCell icon="🤝" label="Belebt" value={s.revives_given} />
-                      <StatCell icon="🔥" label="Streak" value={s.win_streak} highlight={s.win_streak >= 3} />
+                      <StatCell icon="⚡" label="Serie" value={s.win_streak} />
                     </div>
-                    <div className="border-t border-[#E4D9BF] flex items-center justify-center gap-2 py-3">
-                      <span className="text-base">💰</span>
-                      <span className={`text-base font-bold ${getBalanceColor(s.total_balance)}`}>
-                        {formatBalance(s.total_balance)}
-                      </span>
-                      <span className="text-[11px] text-[#7C7461]">Gesamtbilanz</span>
+
+                    {/* Badges */}
+                    {playerBadges.length > 0 && (
+                      <div className="border-t border-[#E4D9BF] px-4 py-3 flex flex-wrap gap-1.5">
+                        {playerBadges.map(b => (
+                          <BadgeChip key={b.label} badge={b} />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Balance history */}
+                    <div className="border-t border-[#E4D9BF] px-4 py-3">
+                      <p className="text-[#7C7461] text-[10px] uppercase tracking-wider mb-1 font-medium">Saldo-Verlauf</p>
+                      <BalanceSparkline history={s.balance_history} />
                     </div>
+
+                    <Link
+                      href={`/spieler/${s.player.id}`}
+                      className="border-t border-[#E4D9BF] flex items-center justify-center gap-1 py-3 text-[#2E6B3A] text-sm font-semibold hover:bg-[#FFFDF7] transition-colors"
+                    >
+                      Profil & Head-to-Head ansehen →
+                    </Link>
                   </div>
                 )}
               </div>
@@ -249,6 +195,18 @@ export default function StatistikenPage() {
   )
 }
 
+function BadgeChip({ badge }: { badge: Badge }) {
+  return (
+    <span
+      title={badge.desc}
+      className="inline-flex items-center gap-1 bg-[#FFFDF7] border border-[#E4D9BF] rounded-full px-2.5 py-1 text-xs text-[#23201A]"
+    >
+      <span>{badge.icon}</span>
+      <span className="font-medium">{badge.label}</span>
+    </span>
+  )
+}
+
 function StatCell({
   icon,
   label,
@@ -257,7 +215,7 @@ function StatCell({
 }: {
   icon: string
   label: string
-  value: number
+  value: number | string
   highlight?: boolean
 }) {
   return (
