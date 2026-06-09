@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { feedbackEnabled, setFeedbackEnabled } from '@/lib/feedback'
 
 const STAKE_KEY = 'schnauz_default_stake'
 
@@ -11,6 +12,7 @@ export default function EinstellungenPage() {
   const [defaultStake, setDefaultStake] = useState(3)
   const [stakeInput, setStakeInput] = useState('3')
   const [saveMsg, setSaveMsg] = useState('')
+  const [feedbackOn, setFeedbackOn] = useState(true)
 
   useEffect(() => {
     const saved = localStorage.getItem(STAKE_KEY)
@@ -18,7 +20,14 @@ export default function EinstellungenPage() {
       setDefaultStake(parseInt(saved))
       setStakeInput(saved)
     }
+    setFeedbackOn(feedbackEnabled())
   }, [])
+
+  function toggleFeedback() {
+    const next = !feedbackOn
+    setFeedbackOn(next)
+    setFeedbackEnabled(next)
+  }
 
   function saveStake() {
     const val = parseInt(stakeInput)
@@ -72,6 +81,20 @@ export default function EinstellungenPage() {
             Aktuell {defaultStake} € · Double {defaultStake * 2} € · Triple {defaultStake * 3} € · Quattro {defaultStake * 4} €
           </p>
         </div>
+
+        {/* Sound & vibration */}
+        <button
+          onClick={toggleFeedback}
+          className="w-full flex items-center justify-between bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-4"
+        >
+          <div className="text-left">
+            <p className="text-[#23201A] font-medium">Sound & Vibration</p>
+            <p className="text-[#7C7461] text-xs mt-0.5">Feedback beim Ausscheiden, Wiederbeleben & Gewinn</p>
+          </div>
+          <span className={`w-11 h-6 rounded-full p-0.5 transition-colors shrink-0 ${feedbackOn ? 'bg-[#2E6B3A]' : 'bg-[#E4D9BF]'}`}>
+            <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${feedbackOn ? 'translate-x-5' : ''}`} />
+          </span>
+        </button>
 
         {/* Link to player management */}
         <Link

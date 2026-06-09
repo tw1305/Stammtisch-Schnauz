@@ -9,6 +9,7 @@ import RoundResultModal from '@/components/ui/RoundResultModal'
 import SessionSummaryModal, { type SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
+import { feedbackEliminate, feedbackRevive, feedbackWinner } from '@/lib/feedback'
 import type { Season, Player, RoundPlayer, SessionPlayer } from '@/types/database'
 
 const STAKE_OPTIONS = [
@@ -66,6 +67,11 @@ export default function SpielPage() {
   useEffect(() => {
     if (activeSeason) loadSeasonBalances()
   }, [activeSeason, session, completedRound, roundPlayers])
+
+  // Winner feedback when a round completes
+  useEffect(() => {
+    if (completedRound) feedbackWinner()
+  }, [completedRound])
 
   async function loadMeta() {
     const { data: seasons } = await supabase
@@ -158,6 +164,7 @@ export default function SpielPage() {
     const rp = roundPlayers.find(r => r.player_id === playerId)
     if (!rp) return
     if (rp.is_active) {
+      feedbackEliminate()
       await eliminatePlayer(playerId)
     } else {
       // Reviving requires choosing who revived this player
@@ -325,7 +332,10 @@ export default function SpielPage() {
             onPick={async reviverId => {
               const target = reviveTarget
               setReviveTarget(null)
-              if (target) await revivePlayer(target, reviverId)
+              if (target) {
+                feedbackRevive()
+                await revivePlayer(target, reviverId)
+              }
             }}
             onClose={() => setReviveTarget(null)}
           />
