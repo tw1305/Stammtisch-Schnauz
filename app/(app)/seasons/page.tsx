@@ -27,8 +27,23 @@ export default function SeasonsPage() {
   const [seasonBalances, setSeasonBalances] = useState<{ player: Player; total: number }[]>([])
   const [sessionsData, setSessionsData] = useState<SessionWithRounds[]>([])
   const [editingRound, setEditingRound] = useState<Round | null>(null)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
 
   useEffect(() => { loadSeasons() }, [])
+
+  async function renameSeason() {
+    if (!detailSeason) return
+    const trimmed = nameInput.trim()
+    if (!trimmed || trimmed === detailSeason.name) {
+      setEditingName(false)
+      return
+    }
+    await supabase.from('seasons').update({ name: trimmed }).eq('id', detailSeason.id)
+    setDetailSeason({ ...detailSeason, name: trimmed })
+    setEditingName(false)
+    await loadSeasons()
+  }
 
   async function loadSeasons() {
     setLoading(true)
@@ -193,16 +208,52 @@ export default function SeasonsPage() {
           >
             ‹
           </button>
-          <h1 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#23201A] flex-1 tracking-tight">
-            {detailSeason.name}
-          </h1>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-            detailSeason.status === 'active'
-              ? 'bg-[#1F9D57]/15 text-[#1F9D57]'
-              : 'bg-[#E4D9BF] text-[#7C7461]'
-          }`}>
-            {detailSeason.status === 'active' ? 'Aktiv' : 'Abgeschlossen'}
-          </span>
+          {editingName ? (
+            <div className="flex-1 flex items-center gap-2">
+              <input
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') renameSeason()
+                  if (e.key === 'Escape') setEditingName(false)
+                }}
+                autoFocus
+                className="flex-1 min-w-0 bg-[#FFFDF7] border border-[#2E6B3A] rounded-xl px-3 py-1.5 text-[#23201A] text-base outline-none"
+              />
+              <button
+                onClick={renameSeason}
+                className="text-[#2E6B3A] text-sm font-semibold px-2 py-1.5 rounded-lg bg-[#2E6B3A]/10"
+              >
+                Speichern
+              </button>
+              <button
+                onClick={() => setEditingName(false)}
+                className="text-[#7C7461] text-xl leading-none w-8 h-8 shrink-0"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <>
+              <h1 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#23201A] flex-1 tracking-tight">
+                {detailSeason.name}
+              </h1>
+              <button
+                onClick={() => { setNameInput(detailSeason.name); setEditingName(true) }}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#7C7461] text-base transition-colors shrink-0"
+                aria-label="Namen bearbeiten"
+              >
+                ✏️
+              </button>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 ${
+                detailSeason.status === 'active'
+                  ? 'bg-[#1F9D57]/15 text-[#1F9D57]'
+                  : 'bg-[#E4D9BF] text-[#7C7461]'
+              }`}>
+                {detailSeason.status === 'active' ? 'Aktiv' : 'Abgeschlossen'}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="px-4 py-2 space-y-6">
