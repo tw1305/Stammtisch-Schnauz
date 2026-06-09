@@ -9,6 +9,7 @@ type Props = {
   sessionBalances: Record<string, number>
   onNewRound: () => void
   onManagePlayers: () => void
+  onUndo?: () => void
 }
 
 export default function RoundResultModal({
@@ -17,6 +18,7 @@ export default function RoundResultModal({
   sessionBalances,
   onNewRound,
   onManagePlayers,
+  onUndo,
 }: Props) {
   const winner = players.find(p => p.player_id === winnerId)
   const winnerName = winner?.player?.name ?? 'Unbekannt'
@@ -80,6 +82,14 @@ export default function RoundResultModal({
           >
             👥 Spielerverwaltung
           </button>
+          {onUndo && (
+            <button
+              onClick={onUndo}
+              className="w-full text-[#7C7461] hover:text-[#C8443B] text-sm font-medium py-2 transition-colors"
+            >
+              ↩ Versehen? Runde rückgängig machen
+            </button>
+          )}
         </div>
       </div>
     </div>

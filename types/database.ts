@@ -22,6 +22,7 @@ export type Session = {
   started_at: string
   ended_at: string | null
   status: 'active' | 'completed'
+  dealer_player_id?: string | null
 }
 
 export type SessionPlayer = {
@@ -30,6 +31,7 @@ export type SessionPlayer = {
   player_id: string
   joined_at: string
   removed_at: string | null
+  seat_order?: number | null
   player?: Player
 }
 

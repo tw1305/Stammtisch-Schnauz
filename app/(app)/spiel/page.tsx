@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
 import GameTable from '@/components/ui/GameTable'
 import RoundResultModal from '@/components/ui/RoundResultModal'
+import SessionSummaryModal, { type SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import type { Season, Player, RoundPlayer } from '@/types/database'
+import type { Season, Player, RoundPlayer, SessionPlayer } from '@/types/database'
 
 const STAKE_OPTIONS = [
   { label: 'Standard', multiplier: 1 },
@@ -35,6 +36,12 @@ export default function SpielPage() {
     startRound,
     eliminatePlayer,
     revivePlayer,
+    undoLast,
+    canUndo,
+    reopenLastRound,
+    moveSeat,
+    setDealer,
+    dealerId,
     endSession,
     dismissCompletedRound,
     reload,
@@ -50,6 +57,7 @@ export default function SpielPage() {
   const [sessionBalances, setSessionBalances] = useState<Record<string, number>>({})
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set())
   const [reviveTarget, setReviveTarget] = useState<string | null>(null)
+  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null)
 
   useEffect(() => {
     loadMeta()
@@ -157,9 +165,38 @@ export default function SpielPage() {
     }
   }
 
+  async function buildSessionSummary(sessionId: string): Promise<SessionSummary> {
+    const { data: rounds } = await supabase
+      .from('rounds')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('status', 'completed')
+      .gt('round_number', 0)
+    const roundIds = (rounds || []).map(r => r.id)
+    if (roundIds.length === 0) return { rounds: 0, players: [] }
+
+    const { data: rps } = await supabase
+      .from('round_players')
+      .select('player_id, balance_change, is_winner, player:players(id, name, avatar_url, is_active, created_at)')
+      .in('round_id', roundIds)
+
+    const map: Record<string, { player: Player; balance: number; wins: number }> = {}
+    for (const rp of rps || []) {
+      const p = rp.player as unknown as Player
+      if (!p) continue
+      if (!map[rp.player_id]) map[rp.player_id] = { player: p, balance: 0, wins: 0 }
+      if (rp.balance_change != null) map[rp.player_id].balance += rp.balance_change
+      if (rp.is_winner) map[rp.player_id].wins++
+    }
+    return { rounds: roundIds.length, players: Object.values(map).sort((a, b) => b.balance - a.balance) }
+  }
+
   async function handleEndSession() {
+    if (!session) return
     if (!confirm('Session wirklich beenden?')) return
+    const summary = await buildSessionSummary(session.id)
     await endSession()
+    setSessionSummary(summary)
     reload()
   }
 
@@ -229,6 +266,10 @@ export default function SpielPage() {
             Zu den Seasons
           </button>
         )}
+
+        {sessionSummary && (
+          <SessionSummaryModal summary={sessionSummary} onClose={() => setSessionSummary(null)} />
+        )}
       </div>
     )
   }
@@ -246,12 +287,21 @@ export default function SpielPage() {
               {activeRound.stake} €
             </span>
           </div>
-          <button
-            onClick={() => router.push('/einstellungen')}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#7C7461] text-lg transition-colors"
-          >
-            ⚙
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={undoLast}
+              disabled={!canUndo}
+              className="h-9 px-3 flex items-center gap-1 rounded-full text-sm font-medium transition-colors disabled:opacity-35 bg-[#FBF6EA] border border-[#E4D9BF] text-[#23201A]"
+            >
+              ↩ Rückgängig
+            </button>
+            <button
+              onClick={() => router.push('/einstellungen')}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#7C7461] text-lg transition-colors"
+            >
+              ⚙
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center px-4">
@@ -260,6 +310,7 @@ export default function SpielPage() {
             roundPlayers={roundPlayers}
             onPlayerTap={handlePlayerTap}
             isRoundActive={true}
+            dealerId={dealerId}
           />
         </div>
 
@@ -305,16 +356,23 @@ export default function SpielPage() {
           sessionPlayers={sessionPlayers}
           sessionBalances={sessionBalances}
           isRoundActive={false}
+          dealerId={dealerId}
         />
       </div>
 
-      {/* Player management */}
-      <div className="px-4 mb-4">
+      {/* Dealer + player management */}
+      <div className="px-4 mb-4 space-y-2">
+        <div className="flex items-center justify-center gap-1.5 text-sm text-[#7C7461]">
+          <span>🃏 Geber:</span>
+          <span className="font-semibold text-[#23201A]">
+            {sessionPlayers.find(sp => sp.player_id === dealerId)?.player?.name ?? '—'}
+          </span>
+        </div>
         <button
           onClick={() => setShowPlayerManager(true)}
           className="w-full bg-[#FBF6EA] border border-[#E4D9BF] text-[#23201A] rounded-2xl py-3 text-sm font-medium hover:border-[#2E6B3A]/50 transition-colors"
         >
-          👥 Spieler hinzufügen / entfernen
+          👥 Spieler & Sitzordnung
         </button>
       </div>
 
@@ -386,8 +444,11 @@ export default function SpielPage() {
         <PlayerManagerOverlay
           sessionPlayers={sessionPlayers}
           allPlayers={allPlayers}
+          dealerId={dealerId}
           onAdd={addPlayerToSession}
           onRemove={removePlayerFromSession}
+          onMove={moveSeat}
+          onSetDealer={setDealer}
           onClose={() => setShowPlayerManager(false)}
         />
       )}
@@ -398,11 +459,16 @@ export default function SpielPage() {
           players={completedRound.players}
           sessionBalances={sessionBalances}
           onNewRound={dismissCompletedRound}
+          onUndo={reopenLastRound}
           onManagePlayers={() => {
             dismissCompletedRound()
             setShowPlayerManager(true)
           }}
         />
+      )}
+
+      {sessionSummary && (
+        <SessionSummaryModal summary={sessionSummary} onClose={() => setSessionSummary(null)} />
       )}
     </div>
   )
@@ -411,58 +477,102 @@ export default function SpielPage() {
 function PlayerManagerOverlay({
   sessionPlayers,
   allPlayers,
+  dealerId,
   onAdd,
   onRemove,
+  onMove,
+  onSetDealer,
   onClose,
 }: {
-  sessionPlayers: { id: string; player_id: string; player?: { name: string } }[]
+  sessionPlayers: SessionPlayer[]
   allPlayers: Player[]
+  dealerId: string | null
   onAdd: (playerId: string) => Promise<void>
   onRemove: (sessionPlayerId: string) => Promise<void>
+  onMove: (sessionPlayerId: string, dir: -1 | 1) => Promise<void>
+  onSetDealer: (playerId: string) => Promise<void>
   onClose: () => void
 }) {
   const activeIds = new Set(sessionPlayers.map(sp => sp.player_id))
+  const others = allPlayers.filter(p => !activeIds.has(p.id))
   const canAdd = sessionPlayers.length < 9
 
   return (
     <Portal>
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
       <div
-        className="w-full max-w-md mx-auto bg-[#FBF6EA] rounded-t-3xl border-t border-[#E4D9BF] max-h-[80vh] flex flex-col animate-pop-in"
+        className="w-full max-w-md mx-auto bg-[#FBF6EA] rounded-t-3xl border-t border-[#E4D9BF] max-h-[82vh] flex flex-col animate-pop-in"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E4D9BF]">
-          <h2 className="font-[family-name:var(--font-display)] font-bold text-[#23201A]">Spieler verwalten</h2>
+          <h2 className="font-[family-name:var(--font-display)] font-bold text-[#23201A]">Spieler & Sitzordnung</h2>
           <button onClick={onClose} className="text-[#7C7461] text-2xl leading-none w-8 h-8">×</button>
         </div>
-        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1.5">
-          {allPlayers.map(p => {
-            const sp = sessionPlayers.find(s => s.player_id === p.id)
-            const inSession = activeIds.has(p.id)
-            return (
-              <div key={p.id} className="flex items-center gap-3 py-2 px-2">
-                <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} eliminated={!inSession} />
-                <span className="text-[#23201A] flex-1">{p.name}</span>
-                {inSession ? (
+
+        <div className="overflow-y-auto flex-1 px-4 py-3">
+          <p className="text-[#7C7461] text-[10px] uppercase tracking-wider mb-2 font-medium px-1">Am Tisch · Reihenfolge & Geber</p>
+          <div className="space-y-1.5 mb-4">
+            {sessionPlayers.map((sp, i) => {
+              const isDealer = sp.player_id === dealerId
+              return (
+                <div key={sp.id} className="flex items-center gap-2 py-1.5 px-2 bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl">
+                  <div className="flex flex-col">
+                    <button
+                      onClick={() => i > 0 && onMove(sp.id, -1)}
+                      disabled={i === 0}
+                      className="text-[#7C7461] text-xs leading-none disabled:opacity-30 px-1"
+                      aria-label="nach oben"
+                    >▲</button>
+                    <button
+                      onClick={() => i < sessionPlayers.length - 1 && onMove(sp.id, 1)}
+                      disabled={i === sessionPlayers.length - 1}
+                      className="text-[#7C7461] text-xs leading-none disabled:opacity-30 px-1"
+                      aria-label="nach unten"
+                    >▼</button>
+                  </div>
+                  <PlayerAvatar name={sp.player?.name ?? ''} avatarUrl={sp.player?.avatar_url} size={34} />
+                  <span className="text-[#23201A] flex-1 text-sm truncate">{sp.player?.name}</span>
                   <button
-                    onClick={() => sp && onRemove(sp.id)}
-                    className="text-[#C8443B] text-sm font-medium px-3 py-1.5 rounded-lg bg-[#C8443B]/10"
+                    onClick={() => onSetDealer(sp.player_id)}
+                    className={`text-xs font-medium px-2.5 py-1.5 rounded-lg ${
+                      isDealer ? 'bg-[#2E6B3A] text-white' : 'bg-[#E4D9BF]/60 text-[#7C7461]'
+                    }`}
+                  >
+                    {isDealer ? '🃏 Geber' : 'Geber'}
+                  </button>
+                  <button
+                    onClick={() => onRemove(sp.id)}
+                    className="text-[#C8443B] text-xs font-medium px-2.5 py-1.5 rounded-lg bg-[#C8443B]/10"
                   >
                     Entfernen
                   </button>
-                ) : (
-                  <button
-                    onClick={() => canAdd && onAdd(p.id)}
-                    disabled={!canAdd}
-                    className="text-[#1F9D57] text-sm font-medium px-3 py-1.5 rounded-lg bg-[#1F9D57]/10 disabled:opacity-40"
-                  >
-                    Hinzufügen
-                  </button>
-                )}
+                </div>
+              )
+            })}
+          </div>
+
+          {others.length > 0 && (
+            <>
+              <p className="text-[#7C7461] text-[10px] uppercase tracking-wider mb-2 font-medium px-1">Weitere Spieler</p>
+              <div className="space-y-1.5">
+                {others.map(p => (
+                  <div key={p.id} className="flex items-center gap-3 py-1.5 px-2">
+                    <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={34} eliminated />
+                    <span className="text-[#7C7461] flex-1 text-sm">{p.name}</span>
+                    <button
+                      onClick={() => canAdd && onAdd(p.id)}
+                      disabled={!canAdd}
+                      className="text-[#1F9D57] text-sm font-medium px-3 py-1.5 rounded-lg bg-[#1F9D57]/10 disabled:opacity-40"
+                    >
+                      Hinzufügen
+                    </button>
+                  </div>
+                ))}
               </div>
-            )
-          })}
+            </>
+          )}
         </div>
+
         <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#E4D9BF]">
           <button onClick={onClose} className="w-full bg-[#2E6B3A] text-white font-semibold rounded-2xl py-3">
             Fertig

@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import type { Session, SessionPlayer, Round, RoundPlayer } from '@/types/database'
 import { calculateBalances } from '@/lib/game-logic'
 
+type UndoAction =
+  | { kind: 'eliminate'; rpId: string; prevWasFirst: boolean }
+  | { kind: 'revive'; rpId: string; prevWasRevived: boolean; reviverRpId?: string; reviverPrevGiven?: number }
+
 export function useSession() {
   const supabase = createClient()
   const [session, setSession] = useState<Session | null>(null)
@@ -12,10 +16,12 @@ export function useSession() {
   const [activeRound, setActiveRound] = useState<Round | null>(null)
   const [roundPlayers, setRoundPlayers] = useState<RoundPlayer[]>([])
   const [loading, setLoading] = useState(true)
+  const [undoStack, setUndoStack] = useState<UndoAction[]>([])
   const [completedRound, setCompletedRound] = useState<{
     round: Round
     players: RoundPlayer[]
     winnerId: string
+    reactivatePlayerId: string
   } | null>(null)
 
   const loadActiveSession = useCallback(async () => {
@@ -28,6 +34,9 @@ export function useSession() {
 
     if (!sessions || sessions.length === 0) {
       setSession(null)
+      setSessionPlayers([])
+      setActiveRound(null)
+      setRoundPlayers([])
       setLoading(false)
       return
     }
@@ -42,7 +51,15 @@ export function useSession() {
       .is('removed_at', null)
       .order('joined_at')
 
-    setSessionPlayers(sp || [])
+    // Client-side seat ordering (column may not exist yet → fallback to joined order)
+    const ordered = (sp || []).slice().sort((a, b) => {
+      const ao = a.seat_order, bo = b.seat_order
+      if (ao == null && bo == null) return 0
+      if (ao == null) return 1
+      if (bo == null) return -1
+      return ao - bo
+    })
+    setSessionPlayers(ordered)
 
     const { data: rounds } = await supabase
       .from('rounds')
@@ -80,11 +97,16 @@ export function useSession() {
 
     if (error || !sess) return
 
-    const spInserts = playerIds.map(pid => ({
-      session_id: sess.id,
-      player_id: pid,
-    }))
+    const spInserts = playerIds.map(pid => ({ session_id: sess.id, player_id: pid }))
     await supabase.from('session_players').insert(spInserts)
+
+    // Best-effort: seat order + initial dealer (ignored if columns missing)
+    await Promise.all(
+      playerIds.map((pid, i) =>
+        supabase.from('session_players').update({ seat_order: i }).eq('session_id', sess.id).eq('player_id', pid)
+      )
+    )
+    await supabase.from('sessions').update({ dealer_player_id: playerIds[0] }).eq('id', sess.id)
 
     await loadActiveSession()
   }
@@ -94,6 +116,7 @@ export function useSession() {
     await supabase.from('session_players').insert({
       session_id: session.id,
       player_id: playerId,
+      seat_order: sessionPlayers.length,
     })
     await loadActiveSession()
   }
@@ -106,6 +129,25 @@ export function useSession() {
     await loadActiveSession()
   }
 
+  async function moveSeat(sessionPlayerId: string, dir: -1 | 1) {
+    const arr = [...sessionPlayers]
+    const idx = arr.findIndex(s => s.id === sessionPlayerId)
+    const swap = idx + dir
+    if (idx < 0 || swap < 0 || swap >= arr.length) return
+    ;[arr[idx], arr[swap]] = [arr[swap], arr[idx]]
+    setSessionPlayers(arr) // optimistic
+    for (let i = 0; i < arr.length; i++) {
+      await supabase.from('session_players').update({ seat_order: i }).eq('id', arr[i].id)
+    }
+    await loadActiveSession()
+  }
+
+  async function setDealer(playerId: string) {
+    if (!session) return
+    await supabase.from('sessions').update({ dealer_player_id: playerId }).eq('id', session.id)
+    setSession({ ...session, dealer_player_id: playerId })
+  }
+
   async function startRound(stake: number) {
     if (!session) return
 
@@ -116,10 +158,7 @@ export function useSession() {
       .order('round_number', { ascending: false })
       .limit(1)
 
-    const roundNumber = lastRound && lastRound.length > 0
-      ? lastRound[0].round_number + 1
-      : 1
-
+    const roundNumber = lastRound && lastRound.length > 0 ? lastRound[0].round_number + 1 : 1
     const activePlayerIds = sessionPlayers.map(sp => sp.player_id)
 
     const { data: round, error } = await supabase
@@ -136,44 +175,27 @@ export function useSession() {
 
     if (error || !round) return
 
-    const rpInserts = activePlayerIds.map(pid => ({
-      round_id: round.id,
-      player_id: pid,
-      is_active: true,
-    }))
+    const rpInserts = activePlayerIds.map(pid => ({ round_id: round.id, player_id: pid, is_active: true }))
     await supabase.from('round_players').insert(rpInserts)
 
+    // Advance dealer to the next seat (best-effort)
+    if (activePlayerIds.length > 0) {
+      const curIdx = activePlayerIds.indexOf(session.dealer_player_id ?? '')
+      const next = activePlayerIds[(curIdx + 1 + activePlayerIds.length) % activePlayerIds.length]
+      await supabase.from('sessions').update({ dealer_player_id: next }).eq('id', session.id)
+    }
+
+    setUndoStack([])
     await loadActiveSession()
   }
 
-  async function refreshRoundState() {
-    if (!activeRound) return
-    const { data: updatedRp } = await supabase
+  async function reloadRoundPlayers(roundId: string) {
+    const { data } = await supabase
       .from('round_players')
       .select('*, player:players(*)')
-      .eq('round_id', activeRound.id)
-
-    const updated = updatedRp || []
-    setRoundPlayers(updated)
-
-    const activePlayers = updated.filter(r => r.is_active)
-
-    // Mark finalists when 2 remain
-    if (activePlayers.length === 2) {
-      for (const ap of activePlayers) {
-        if (!ap.reached_final) {
-          await supabase
-            .from('round_players')
-            .update({ reached_final: true })
-            .eq('id', ap.id)
-        }
-      }
-    }
-
-    // End round when 1 remains
-    if (activePlayers.length === 1) {
-      await endRound(updated, activePlayers[0].player_id)
-    }
+      .eq('round_id', roundId)
+    setRoundPlayers(data || [])
+    return (data || []) as RoundPlayer[]
   }
 
   async function eliminatePlayer(playerId: string) {
@@ -184,13 +206,24 @@ export function useSession() {
     const firstEliminated = roundPlayers.every(r => r.is_active || r.player_id === playerId)
     await supabase
       .from('round_players')
-      .update({
-        is_active: false,
-        was_first_eliminated: firstEliminated && !rp.was_revived,
-      })
+      .update({ is_active: false, was_first_eliminated: firstEliminated && !rp.was_revived })
       .eq('id', rp.id)
 
-    await refreshRoundState()
+    setUndoStack(s => [...s, { kind: 'eliminate', rpId: rp.id, prevWasFirst: rp.was_first_eliminated }])
+
+    const updated = await reloadRoundPlayers(activeRound.id)
+    const activePlayers = updated.filter(r => r.is_active)
+
+    if (activePlayers.length === 2) {
+      for (const ap of activePlayers) {
+        if (!ap.reached_final) {
+          await supabase.from('round_players').update({ reached_final: true }).eq('id', ap.id)
+        }
+      }
+    }
+    if (activePlayers.length === 1) {
+      await endRound(updated, activePlayers[0].player_id, playerId)
+    }
   }
 
   async function revivePlayer(playerId: string, reviverId: string) {
@@ -198,34 +231,61 @@ export function useSession() {
     const rp = roundPlayers.find(r => r.player_id === playerId)
     if (!rp || rp.is_active) return
 
-    await supabase
-      .from('round_players')
-      .update({ is_active: true, was_revived: true })
-      .eq('id', rp.id)
+    await supabase.from('round_players').update({ is_active: true, was_revived: true }).eq('id', rp.id)
 
-    // Credit the reviver (defensive: works even before the column exists)
     const reviver = roundPlayers.find(r => r.player_id === reviverId)
     if (reviver) {
-      try {
+      await supabase
+        .from('round_players')
+        .update({ revives_given: (reviver.revives_given ?? 0) + 1 })
+        .eq('id', reviver.id)
+    }
+
+    setUndoStack(s => [
+      ...s,
+      {
+        kind: 'revive',
+        rpId: rp.id,
+        prevWasRevived: rp.was_revived,
+        reviverRpId: reviver?.id,
+        reviverPrevGiven: reviver?.revives_given ?? 0,
+      },
+    ])
+
+    await reloadRoundPlayers(activeRound.id)
+  }
+
+  async function undoLast() {
+    if (!activeRound || undoStack.length === 0) return
+    const action = undoStack[undoStack.length - 1]
+
+    if (action.kind === 'eliminate') {
+      await supabase
+        .from('round_players')
+        .update({ is_active: true, was_first_eliminated: action.prevWasFirst })
+        .eq('id', action.rpId)
+    } else {
+      await supabase
+        .from('round_players')
+        .update({ is_active: false, was_revived: action.prevWasRevived })
+        .eq('id', action.rpId)
+      if (action.reviverRpId) {
         await supabase
           .from('round_players')
-          .update({ revives_given: (reviver.revives_given ?? 0) + 1 })
-          .eq('id', reviver.id)
-      } catch {
-        // revives_given column may not exist yet — ignore
+          .update({ revives_given: action.reviverPrevGiven ?? 0 })
+          .eq('id', action.reviverRpId)
       }
     }
 
-    await refreshRoundState()
+    setUndoStack(s => s.slice(0, -1))
+    await reloadRoundPlayers(activeRound.id) // no auto-end on undo
   }
 
-  async function endRound(players: RoundPlayer[], winnerId: string) {
+  async function endRound(players: RoundPlayer[], winnerId: string, lastEliminatedId: string) {
     if (!activeRound) return
-
     const { stake, player_count } = activeRound
     const { winnerGain, loserLoss } = calculateBalances(player_count, stake)
 
-    // Update balances
     for (const rp of players) {
       const isWinner = rp.player_id === winnerId
       await supabase
@@ -240,11 +300,7 @@ export function useSession() {
 
     await supabase
       .from('rounds')
-      .update({
-        status: 'completed',
-        winner_id: winnerId,
-        ended_at: new Date().toISOString(),
-      })
+      .update({ status: 'completed', winner_id: winnerId, ended_at: new Date().toISOString() })
       .eq('id', activeRound.id)
 
     const { data: finalRp } = await supabase
@@ -256,9 +312,35 @@ export function useSession() {
       round: { ...activeRound, status: 'completed', winner_id: winnerId },
       players: finalRp || [],
       winnerId,
+      reactivatePlayerId: lastEliminatedId,
     })
+    setUndoStack([])
     setActiveRound(null)
     setRoundPlayers([])
+    await loadActiveSession()
+  }
+
+  // Reopen a just-completed round (undo the round-ending tap)
+  async function reopenLastRound() {
+    if (!completedRound) return
+    const roundId = completedRound.round.id
+
+    await supabase
+      .from('round_players')
+      .update({ is_winner: false, balance_change: null })
+      .eq('round_id', roundId)
+    await supabase
+      .from('round_players')
+      .update({ is_active: true })
+      .eq('round_id', roundId)
+      .eq('player_id', completedRound.reactivatePlayerId)
+    await supabase
+      .from('rounds')
+      .update({ status: 'active', winner_id: null, ended_at: null })
+      .eq('id', roundId)
+
+    setCompletedRound(null)
+    setUndoStack([])
     await loadActiveSession()
   }
 
@@ -284,12 +366,18 @@ export function useSession() {
     roundPlayers,
     loading,
     completedRound,
+    canUndo: undoStack.length > 0,
+    dealerId: session?.dealer_player_id ?? null,
     startSession,
     addPlayerToSession,
     removePlayerFromSession,
+    moveSeat,
+    setDealer,
     startRound,
     eliminatePlayer,
     revivePlayer,
+    undoLast,
+    reopenLastRound,
     endSession,
     dismissCompletedRound,
     reload: loadActiveSession,

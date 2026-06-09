@@ -10,6 +10,7 @@ type GameTableProps = {
   sessionBalances?: Record<string, number>
   onPlayerTap?: (playerId: string) => void
   isRoundActive?: boolean
+  dealerId?: string | null
 }
 
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
@@ -30,6 +31,7 @@ export default function GameTable({
   sessionBalances = {},
   onPlayerTap,
   isRoundActive = false,
+  dealerId = null,
 }: GameTableProps) {
   const count = sessionPlayers.length
   const { avatar, name: nameClass, bal: balClass, radius } = sizingFor(count)
@@ -105,13 +107,23 @@ export default function GameTable({
             className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform"
             style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
           >
-            <PlayerAvatar
-              name={player.name}
-              avatarUrl={player.avatar_url}
-              size={avatar}
-              eliminated={isEliminated}
-              isWinner={isWinner}
-            />
+            <div className="relative">
+              <PlayerAvatar
+                name={player.name}
+                avatarUrl={player.avatar_url}
+                size={avatar}
+                eliminated={isEliminated}
+                isWinner={isWinner}
+              />
+              {dealerId === sp.player_id && (
+                <span
+                  className="absolute -top-1 -left-1 bg-[#2E6B3A] text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow ring-2 ring-[#F4ECDA]"
+                  title="Geber"
+                >
+                  G
+                </span>
+              )}
+            </div>
             {/* Name plate — ties avatar, name and balance into one token */}
             <div
               className={`-mt-2.5 px-2.5 py-1 rounded-xl border shadow-sm flex flex-col items-center min-w-[58px] max-w-[104px] relative z-10
