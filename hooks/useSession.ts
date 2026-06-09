@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Session, SessionPlayer, Round, RoundPlayer } from '@/types/database'
 import { calculateBalances } from '@/lib/game-logic'
@@ -87,6 +87,26 @@ export function useSession() {
   useEffect(() => {
     loadActiveSession()
   }, [loadActiveSession])
+
+  // Live-Sync: reload when any relevant table changes (multi-device tables).
+  const reloadRef = useRef(loadActiveSession)
+  reloadRef.current = loadActiveSession
+  useEffect(() => {
+    const channel = supabase.channel('schnauz-sync')
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const trigger = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => reloadRef.current(), 250)
+    }
+    for (const table of ['sessions', 'session_players', 'rounds', 'round_players']) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, trigger)
+    }
+    channel.subscribe()
+    return () => {
+      if (timer) clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
+  }, [supabase])
 
   async function startSession(seasonId: string, playerIds: string[]) {
     const { data: sess, error } = await supabase
