@@ -96,6 +96,12 @@ export type HeadToHead = {
   theirWins: number
 }
 
+export type SessionBalancePoint = {
+  session: Session
+  delta: number // net € change during this session
+  cumulative: number // running total after this session
+}
+
 export type DebtSettlement = {
   from: Player
   to: Player

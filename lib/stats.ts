@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Player, PlayerStats, Badge, HeadToHead } from '@/types/database'
+import type { Player, PlayerStats, Badge, HeadToHead, Session, SessionBalancePoint } from '@/types/database'
 
 type Supa = SupabaseClient
 
@@ -148,6 +148,59 @@ export function deriveBadges(allStats: PlayerStats[]): Record<string, Badge[]> {
   award(s => s.first_eliminations, 1, { icon: '💀', label: 'Pechvogel', desc: 'Am häufigsten zuerst raus' })
 
   return result
+}
+
+/**
+ * Cumulative balance per session (Spielabend) for one player, chronological.
+ * Each point carries the net change that evening plus the running total,
+ * so the progression can be labelled with concrete € amounts.
+ */
+export async function computeBalanceTimeline(
+  supabase: Supa,
+  playerId: string
+): Promise<SessionBalancePoint[]> {
+  const { data: rps } = await supabase
+    .from('round_players')
+    .select('round_id, balance_change')
+    .eq('player_id', playerId)
+  if (!rps || rps.length === 0) return []
+
+  const changeByRound: Record<string, number> = {}
+  for (const rp of rps) {
+    if (rp.balance_change == null) continue
+    changeByRound[rp.round_id] = (changeByRound[rp.round_id] ?? 0) + rp.balance_change
+  }
+  const roundIds = Object.keys(changeByRound)
+  if (roundIds.length === 0) return []
+
+  // Only completed rounds count towards the balance (matches computePlayerStats).
+  const { data: rounds } = await supabase
+    .from('rounds')
+    .select('id, session_id')
+    .in('id', roundIds)
+    .eq('status', 'completed')
+
+  const deltaBySession: Record<string, number> = {}
+  for (const r of (rounds || []) as { id: string; session_id: string }[]) {
+    deltaBySession[r.session_id] = (deltaBySession[r.session_id] ?? 0) + (changeByRound[r.id] ?? 0)
+  }
+  const sessionIds = Object.keys(deltaBySession)
+  if (sessionIds.length === 0) return []
+
+  const { data: sessions } = await supabase
+    .from('sessions')
+    .select('*')
+    .in('id', sessionIds)
+    .order('started_at', { ascending: true })
+
+  let cum = 0
+  const points: SessionBalancePoint[] = []
+  for (const s of (sessions || []) as Session[]) {
+    const delta = deltaBySession[s.id] ?? 0
+    cum += delta
+    points.push({ session: s, delta, cumulative: cum })
+  }
+  return points
 }
 
 /** Head-to-head record for one player across all completed real rounds. */
