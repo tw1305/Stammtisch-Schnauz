@@ -102,6 +102,13 @@ export type SessionBalancePoint = {
   cumulative: number // running total after this session
 }
 
+export type AchievementTally = {
+  icon: string
+  label: string
+  desc: string
+  count: number // how many seasons this achievement was earned
+}
+
 export type DebtSettlement = {
   from: Player
   to: Player

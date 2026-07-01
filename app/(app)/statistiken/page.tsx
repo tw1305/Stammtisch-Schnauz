@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
-import { computePlayerStats, deriveBadges } from '@/lib/stats'
+import { computePlayerStats, deriveBadges, computeSeasonAchievements } from '@/lib/stats'
 import BalanceSparkline from '@/components/ui/BalanceSparkline'
-import type { Season, PlayerStats, Badge } from '@/types/database'
+import AchievementsInfoModal from '@/components/ui/AchievementsInfoModal'
+import type { Season, PlayerStats, Badge, AchievementTally } from '@/types/database'
 
 const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] = [
   { key: 'balance', label: 'Gesamtbilanz', get: s => s.total_balance },
@@ -36,6 +37,8 @@ export default function StatistikenPage() {
   const [stats, setStats] = useState<PlayerStats[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [tally, setTally] = useState<Record<string, AchievementTally[]>>({})
+  const [showInfo, setShowInfo] = useState(false)
 
   function toggle(id: string) {
     setExpanded(prev => {
@@ -46,17 +49,23 @@ export default function StatistikenPage() {
     })
   }
 
-  useEffect(() => { loadSeasons() }, [])
+  useEffect(() => { loadSeasons(); loadTally() }, [])
   useEffect(() => { loadStats() }, [selectedSeasonId])
 
   async function loadSeasons() {
+    // Oldest → newest, so the dropdown reads "Alle Seasons" then chronological.
     const { data } = await supabase
       .from('seasons')
       .select('*')
-      .order('start_date', { ascending: false })
+      .order('start_date', { ascending: true })
     setSeasons(data || [])
+    // Default to the currently active season when there is one.
     const active = (data || []).find(s => s.status === 'active')
     if (active) setSelectedSeasonId(active.id)
+  }
+
+  async function loadTally() {
+    setTally(await computeSeasonAchievements(supabase))
   }
 
   async function loadStats() {
@@ -69,14 +78,24 @@ export default function StatistikenPage() {
   const sortGet = SORTS.find(x => x.key === sortKey)!.get
   const sorted = [...stats].sort((a, b) => sortGet(b) - sortGet(a) || b.total_balance - a.total_balance)
   const badges = deriveBadges(stats)
+  const isAll = selectedSeasonId === 'all'
 
   return (
     <div className="flex flex-col max-w-md mx-auto w-full">
       {/* Header */}
       <div className="px-4 pt-5 pb-3">
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#23201A] mb-2.5 tracking-tight">
-          Statistiken
-        </h1>
+        <div className="flex items-center justify-between mb-2.5">
+          <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#23201A] tracking-tight">
+            Statistiken
+          </h1>
+          <button
+            onClick={() => setShowInfo(true)}
+            aria-label="Achievements erklären"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-[#FBF6EA] border border-[#E4D9BF] text-lg hover:bg-[#FFFDF7] transition-colors shrink-0"
+          >
+            🏅
+          </button>
+        </div>
         <div className="flex gap-2">
           <select
             value={selectedSeasonId}
@@ -113,6 +132,7 @@ export default function StatistikenPage() {
             const medal = rankColor(i)
             const isPodium = i < 3
             const playerBadges = badges[s.player.id] ?? []
+            const playerAch = tally[s.player.id] ?? []
             return (
               <div
                 key={s.player.id}
@@ -132,9 +152,20 @@ export default function StatistikenPage() {
                     {i + 1}
                   </div>
                   <span className="min-w-0 font-semibold text-[15px] text-[#23201A] truncate">{s.player.name}</span>
-                  {playerBadges.length > 0 && (
-                    <span className="text-xs leading-none shrink-0">{playerBadges.map(b => b.icon).join('')}</span>
-                  )}
+                  {isAll
+                    ? playerAch.length > 0 && (
+                        <span className="flex items-center gap-1 shrink-0 leading-none">
+                          {playerAch.map(a => (
+                            <span key={a.label} className="inline-flex items-center gap-px">
+                              <span className="text-xs">{a.icon}</span>
+                              <span className="text-[10px] font-semibold text-[#7C7461]">{a.count}</span>
+                            </span>
+                          ))}
+                        </span>
+                      )
+                    : playerBadges.length > 0 && (
+                        <span className="text-xs leading-none shrink-0">{playerBadges.map(b => b.icon).join('')}</span>
+                      )}
                   <span className={`ml-auto font-bold text-base tabular-nums ${getBalanceColor(s.total_balance)}`}>
                     {formatBalance(s.total_balance)}
                   </span>
@@ -161,12 +192,12 @@ export default function StatistikenPage() {
                       <StatCell icon="⚡" label="Serie" value={s.win_streak} />
                     </div>
 
-                    {/* Badges */}
-                    {playerBadges.length > 0 && (
+                    {/* Achievements */}
+                    {(isAll ? playerAch.length > 0 : playerBadges.length > 0) && (
                       <div className="border-t border-[#E4D9BF] px-4 py-3 flex flex-wrap gap-1.5">
-                        {playerBadges.map(b => (
-                          <BadgeChip key={b.label} badge={b} />
-                        ))}
+                        {isAll
+                          ? playerAch.map(a => <BadgeChip key={a.label} badge={a} count={a.count} />)
+                          : playerBadges.map(b => <BadgeChip key={b.label} badge={b} />)}
                       </div>
                     )}
 
@@ -189,11 +220,13 @@ export default function StatistikenPage() {
           })
         )}
       </div>
+
+      {showInfo && <AchievementsInfoModal onClose={() => setShowInfo(false)} />}
     </div>
   )
 }
 
-function BadgeChip({ badge }: { badge: Badge }) {
+function BadgeChip({ badge, count }: { badge: Badge; count?: number }) {
   return (
     <span
       title={badge.desc}
@@ -201,6 +234,7 @@ function BadgeChip({ badge }: { badge: Badge }) {
     >
       <span>{badge.icon}</span>
       <span className="font-medium">{badge.label}</span>
+      {count != null && <span className="font-bold text-[#2E6B3A]">×{count}</span>}
     </span>
   )
 }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Player, PlayerStats, Badge, HeadToHead, Session, SessionBalancePoint } from '@/types/database'
+import type { Player, PlayerStats, Badge, HeadToHead, Session, SessionBalancePoint, AchievementTally } from '@/types/database'
 
 type Supa = SupabaseClient
 
@@ -123,30 +123,73 @@ export async function computePlayerStats(
   return Object.values(statsMap).sort((a, b) => b.total_balance - a.total_balance)
 }
 
+/**
+ * Achievement definitions. Each is awarded (per scope, e.g. per season) to the
+ * player(s) with the highest value for `pick`, provided the max reaches `min`.
+ */
+export const ACHIEVEMENTS: {
+  icon: string
+  label: string
+  desc: string
+  min: number
+  pick: (s: PlayerStats) => number
+}[] = [
+  { icon: '💰', label: 'Krösus', desc: 'Höchste Gesamtbilanz der Season', min: 1, pick: s => s.total_balance },
+  { icon: '🎯', label: 'Stammgast', desc: 'Meiste gespielte Runden der Season', min: 1, pick: s => s.rounds_played },
+  { icon: '🏆', label: 'Seriensieger', desc: 'Meiste Rundensiege der Season', min: 1, pick: s => s.wins },
+  { icon: '🔥', label: 'Heißlauf', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
+  { icon: '🐦', label: 'Phönix', desc: 'In der Season am häufigsten wiederbelebt', min: 1, pick: s => s.revivals },
+  { icon: '🤝', label: 'Lebensretter', desc: 'Hat in der Season am häufigsten andere belebt', min: 1, pick: s => s.revives_given },
+  { icon: '💀', label: 'Pechvogel', desc: 'In der Season am häufigsten zuerst raus', min: 1, pick: s => s.first_eliminations },
+]
+
 /** Relative achievements across the given stat set. Awards to all tied leaders. */
 export function deriveBadges(allStats: PlayerStats[]): Record<string, Badge[]> {
   const result: Record<string, Badge[]> = {}
   for (const s of allStats) result[s.player.id] = []
 
-  const award = (
-    pick: (s: PlayerStats) => number,
-    min: number,
-    badge: Badge
-  ) => {
+  for (const a of ACHIEVEMENTS) {
     let max = -Infinity
-    for (const s of allStats) max = Math.max(max, pick(s))
-    if (max < min) return
-    for (const s of allStats) if (pick(s) === max) result[s.player.id].push(badge)
+    for (const s of allStats) max = Math.max(max, a.pick(s))
+    if (max < a.min) continue
+    for (const s of allStats) {
+      if (a.pick(s) === max) result[s.player.id].push({ icon: a.icon, label: a.label, desc: a.desc })
+    }
   }
 
-  award(s => s.total_balance, 1, { icon: '💰', label: 'Krösus', desc: 'Höchste Gesamtbilanz' })
-  award(s => s.rounds_played, 1, { icon: '🎯', label: 'Stammgast', desc: 'Meiste gespielte Runden' })
-  award(s => s.wins, 1, { icon: '🏆', label: 'Seriensieger', desc: 'Meiste Rundensiege' })
-  award(s => s.longest_streak, 3, { icon: '🔥', label: 'Heißlauf', desc: 'Längste Siegesserie (≥3)' })
-  award(s => s.revivals, 1, { icon: '🐦', label: 'Phönix', desc: 'Am häufigsten wiederbelebt' })
-  award(s => s.revives_given, 1, { icon: '🤝', label: 'Lebensretter', desc: 'Hat am häufigsten andere belebt' })
-  award(s => s.first_eliminations, 1, { icon: '💀', label: 'Pechvogel', desc: 'Am häufigsten zuerst raus' })
+  return result
+}
 
+/**
+ * Tally of achievements per player across all seasons: how many seasons each
+ * player held each achievement. Achievements are scored independently per season.
+ */
+export async function computeSeasonAchievements(
+  supabase: Supa
+): Promise<Record<string, AchievementTally[]>> {
+  const { data: seasons } = await supabase.from('seasons').select('id')
+  const counts: Record<string, Record<string, number>> = {}
+
+  for (const season of seasons || []) {
+    const stats = await computePlayerStats(supabase, { seasonId: season.id })
+    const badges = deriveBadges(stats)
+    for (const [pid, list] of Object.entries(badges)) {
+      for (const b of list) {
+        if (!counts[pid]) counts[pid] = {}
+        counts[pid][b.label] = (counts[pid][b.label] ?? 0) + 1
+      }
+    }
+  }
+
+  const result: Record<string, AchievementTally[]> = {}
+  for (const [pid, byLabel] of Object.entries(counts)) {
+    result[pid] = ACHIEVEMENTS.filter(a => (byLabel[a.label] ?? 0) > 0).map(a => ({
+      icon: a.icon,
+      label: a.label,
+      desc: a.desc,
+      count: byLabel[a.label],
+    }))
+  }
   return result
 }
 

@@ -3,15 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { computePlayerStats, deriveBadges, computeHeadToHead, computeBalanceTimeline } from '@/lib/stats'
+import { computePlayerStats, computeSeasonAchievements, computeHeadToHead, computeBalanceTimeline } from '@/lib/stats'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import BalanceSparkline from '@/components/ui/BalanceSparkline'
-import type { Player, PlayerStats, Badge, HeadToHead, Season, SessionBalancePoint } from '@/types/database'
-
-function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
-}
+import type { Player, PlayerStats, AchievementTally, HeadToHead, Season, SessionBalancePoint } from '@/types/database'
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>()
@@ -21,7 +17,7 @@ export default function PlayerDetailPage() {
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [stat, setStat] = useState<PlayerStats | null>(null)
-  const [badges, setBadges] = useState<Badge[]>([])
+  const [achievements, setAchievements] = useState<AchievementTally[]>([])
   const [h2h, setH2h] = useState<HeadToHead[]>([])
   const [timeline, setTimeline] = useState<SessionBalancePoint[]>([])
   const [seasonRows, setSeasonRows] = useState<{ season: Season; balance: number }[]>([])
@@ -37,7 +33,7 @@ export default function PlayerDetailPage() {
     const allStats = await computePlayerStats(supabase, {})
     const mine = allStats.find(s => s.player.id === id) ?? null
     setStat(mine)
-    setBadges(deriveBadges(allStats)[id] ?? [])
+    setAchievements((await computeSeasonAchievements(supabase))[id] ?? [])
 
     setH2h(await computeHeadToHead(supabase, id))
     setTimeline(await computeBalanceTimeline(supabase, id))
@@ -61,6 +57,18 @@ export default function PlayerDetailPage() {
   if (!player) {
     return <div className="flex items-center justify-center min-h-[60vh] text-[#7C7461]">Spieler nicht gefunden.</div>
   }
+
+  // Mark each season's end result on the balance graph: anchor at the season's
+  // last session, labelled with that season's net result.
+  const seasonNet = new Map(seasonRows.map(r => [r.season.id, r.balance]))
+  const seasonName = new Map(seasonRows.map(r => [r.season.id, r.season.name]))
+  const lastIdxBySeason = new Map<string, number>()
+  timeline.forEach((p, i) => lastIdxBySeason.set(p.session.season_id, i))
+  const seasonMarkers = [...lastIdxBySeason.entries()].map(([sid, index]) => ({
+    index,
+    value: seasonNet.get(sid) ?? timeline[index].cumulative,
+    caption: (seasonName.get(sid) ?? '').split(' - ')[0],
+  }))
 
   return (
     <div className="flex flex-col max-w-md mx-auto w-full">
@@ -87,11 +95,12 @@ export default function PlayerDetailPage() {
             {formatBalance(stat.total_balance)} gesamt
           </span>
         )}
-        {badges.length > 0 && (
+        {achievements.length > 0 && (
           <div className="flex flex-wrap gap-1.5 justify-center mt-1">
-            {badges.map(b => (
-              <span key={b.label} title={b.desc} className="inline-flex items-center gap-1 bg-[#FBF6EA] border border-[#E4D9BF] rounded-full px-2.5 py-1 text-xs text-[#23201A]">
-                <span>{b.icon}</span><span className="font-medium">{b.label}</span>
+            {achievements.map(a => (
+              <span key={a.label} title={a.desc} className="inline-flex items-center gap-1 bg-[#FBF6EA] border border-[#E4D9BF] rounded-full px-2.5 py-1 text-xs text-[#23201A]">
+                <span>{a.icon}</span><span className="font-medium">{a.label}</span>
+                <span className="font-bold text-[#2E6B3A]">×{a.count}</span>
               </span>
             ))}
           </div>
@@ -122,43 +131,16 @@ export default function PlayerDetailPage() {
           {/* Balance history */}
           <div>
             <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">Saldo-Verlauf</p>
-            <div className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
-              {timeline.length < 2 ? (
-                <div className="px-4 py-3">
-                  <BalanceSparkline history={stat.balance_history} height={80} />
-                </div>
+            <div className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] px-4 py-3">
+              {timeline.length >= 2 ? (
+                <BalanceSparkline history={timeline.map(t => t.cumulative)} height={90} markers={seasonMarkers} />
               ) : (
-                <>
-                  <div className="px-4 pt-3 pb-1">
-                    <BalanceSparkline history={timeline.map(t => t.cumulative)} height={80} />
-                  </div>
-                  <div className="grid grid-cols-[1.5rem_1fr_3.5rem_4rem] gap-x-2 items-center border-t border-[#E4D9BF] px-4 py-1.5 text-[10px] uppercase tracking-wider text-[#7C7461]">
-                    <span>#</span>
-                    <span>Datum</span>
-                    <span className="text-right">Abend</span>
-                    <span className="text-right">Gesamt</span>
-                  </div>
-                  {timeline.map((t, i) => (
-                    <div
-                      key={t.session.id}
-                      className="grid grid-cols-[1.5rem_1fr_3.5rem_4rem] gap-x-2 items-center px-4 py-2 border-t border-[#E4D9BF]"
-                    >
-                      <span className="text-[#7C7461] text-xs tabular-nums">{i + 1}</span>
-                      <span className="text-[#23201A] text-sm">{formatSessionDate(t.session.started_at)}</span>
-                      <span className={`text-xs text-right tabular-nums ${getBalanceColor(t.delta)}`}>
-                        {formatBalance(t.delta)}
-                      </span>
-                      <span className={`text-sm font-bold text-right tabular-nums ${getBalanceColor(t.cumulative)}`}>
-                        {formatBalance(t.cumulative)}
-                      </span>
-                    </div>
-                  ))}
-                </>
+                <BalanceSparkline history={stat.balance_history} height={80} />
               )}
             </div>
             {timeline.length >= 2 && (
               <p className="text-[#7C7461] text-[11px] mt-1.5 leading-snug">
-                „Abend" = Ergebnis des jeweiligen Spielabends, „Gesamt" = daraus aufsummierter Saldo.
+                Markierungen zeigen das Endergebnis jeder Season.
               </p>
             )}
           </div>
