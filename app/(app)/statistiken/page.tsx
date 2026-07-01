@@ -73,15 +73,15 @@ export default function StatistikenPage() {
   return (
     <div className="flex flex-col max-w-md mx-auto w-full">
       {/* Header */}
-      <div className="px-4 pt-6 pb-4">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] mb-3 tracking-tight">
+      <div className="px-4 pt-5 pb-3">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#23201A] mb-2.5 tracking-tight">
           Statistiken
         </h1>
         <div className="flex gap-2">
           <select
             value={selectedSeasonId}
             onChange={e => setSelectedSeasonId(e.target.value)}
-            className="flex-1 min-w-0 bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-3 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
+            className="flex-1 min-w-0 bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl px-3 py-2 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
           >
             <option value="all">Alle Seasons</option>
             {seasons.map(s => (
@@ -91,7 +91,7 @@ export default function StatistikenPage() {
           <select
             value={sortKey}
             onChange={e => setSortKey(e.target.value)}
-            className="flex-1 min-w-0 bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-3 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
+            className="flex-1 min-w-0 bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl px-3 py-2 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
             aria-label="Sortieren nach"
           >
             {SORTS.map(o => (
@@ -102,7 +102,7 @@ export default function StatistikenPage() {
       </div>
 
       {/* Stats */}
-      <div className="px-4 py-4 space-y-2.5">
+      <div className="px-4 pt-1 pb-4 space-y-1.5">
         {loading ? (
           <div className="text-center text-[#7C7461] py-10">Laden...</div>
         ) : sorted.length === 0 ? (
@@ -116,31 +116,29 @@ export default function StatistikenPage() {
             return (
               <div
                 key={s.player.id}
-                className="bg-[#FBF6EA] rounded-2xl border overflow-hidden"
+                className="bg-[#FBF6EA] rounded-xl border overflow-hidden"
                 style={{ borderColor: isPodium ? medal : '#E4D9BF' }}
               >
                 <button
                   onClick={() => toggle(s.player.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
                     isOpen ? 'bg-[#FFFDF7]' : 'hover:bg-[#FFFDF7]/60'
                   }`}
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
                     style={{ backgroundColor: medal, boxShadow: isPodium ? `0 0 0 2px ${medal}33` : undefined }}
                   >
                     {i + 1}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-semibold text-[#23201A] truncate block">{s.player.name}</span>
-                    {playerBadges.length > 0 && (
-                      <span className="text-xs leading-none">{playerBadges.map(b => b.icon).join(' ')}</span>
-                    )}
-                  </div>
-                  <span className={`font-bold text-lg ${getBalanceColor(s.total_balance)}`}>
+                  <span className="min-w-0 font-semibold text-[15px] text-[#23201A] truncate">{s.player.name}</span>
+                  {playerBadges.length > 0 && (
+                    <span className="text-xs leading-none shrink-0">{playerBadges.map(b => b.icon).join('')}</span>
+                  )}
+                  <span className={`ml-auto font-bold text-base tabular-nums ${getBalanceColor(s.total_balance)}`}>
                     {formatBalance(s.total_balance)}
                   </span>
-                  <span className={`text-[#7C7461] text-sm transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                  <span className={`text-[#7C7461] text-xs shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
                     ⌄
                   </span>
                 </button>
