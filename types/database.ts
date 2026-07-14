@@ -4,6 +4,7 @@ export type Player = {
   avatar_url: string | null
   is_active: boolean
   created_at: string
+  birthday?: string | null // "DD.MM" (day + month only), null when unset
 }
 
 export type Season = {

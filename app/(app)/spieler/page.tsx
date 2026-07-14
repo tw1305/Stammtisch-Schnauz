@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
 import AvatarCropper from '@/components/ui/AvatarCropper'
+import { formatBirthday, normalizeBirthday } from '@/lib/birthday'
 import type { Player } from '@/types/database'
 
 function readFile(file: File): Promise<string> {
@@ -80,13 +81,15 @@ export default function SpielerPage() {
             onClick={() => setEditing(p)}
             className="w-full flex items-center gap-3.5 bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl px-4 py-3 hover:border-[#2E6B3A]/50 transition-colors text-left"
           >
-            <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={48} eliminated={!p.is_active} />
+            <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={48} eliminated={!p.is_active} birthday={p.birthday} />
             <div className="flex-1 min-w-0">
               <p className={`font-semibold truncate ${p.is_active ? 'text-[#23201A]' : 'text-[#7C7461] line-through'}`}>
                 {p.name}
               </p>
               <p className="text-[#7C7461] text-xs mt-0.5">
-                {p.is_active ? 'Aktiv' : 'Inaktiv'} · Zum Bearbeiten tippen
+                {p.is_active ? 'Aktiv' : 'Inaktiv'}
+                {formatBirthday(p.birthday) && ` · 🎂 ${formatBirthday(p.birthday)}`}
+                {' · Zum Bearbeiten tippen'}
               </p>
             </div>
             <span className="text-[#7C7461] text-lg">›</span>
@@ -118,6 +121,7 @@ function PlayerEditor({
   const [name, setName] = useState(player.name)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(player.avatar_url)
   const [isActive, setIsActive] = useState(player.is_active)
+  const [birthday, setBirthday] = useState(formatBirthday(player.birthday))
   const [saving, setSaving] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -139,7 +143,7 @@ function PlayerEditor({
     setSaving(true)
     await supabase
       .from('players')
-      .update({ name: name.trim(), avatar_url: avatarUrl, is_active: isActive })
+      .update({ name: name.trim(), avatar_url: avatarUrl, is_active: isActive, birthday: normalizeBirthday(birthday) })
       .eq('id', player.id)
     setSaving(false)
     onSaved()
@@ -165,7 +169,7 @@ function PlayerEditor({
                 className="rounded-full"
                 title={avatarUrl ? 'Bild ausrichten' : undefined}
               >
-                <PlayerAvatar name={name || '?'} avatarUrl={avatarUrl} size={96} />
+                <PlayerAvatar name={name || '?'} avatarUrl={avatarUrl} size={96} birthday={normalizeBirthday(birthday)} />
               </button>
               <div className="flex gap-2 flex-wrap justify-center">
                 <button
@@ -202,6 +206,21 @@ function PlayerEditor({
                 onChange={e => setName(e.target.value)}
                 className="w-full bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] outline-none focus:border-[#2E6B3A] transition-colors"
               />
+            </div>
+
+            {/* Birthday (day + month only) */}
+            <div>
+              <label className="block text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">Geburtstag (TT.MM.)</label>
+              <input
+                value={birthday}
+                onChange={e => setBirthday(e.target.value)}
+                inputMode="numeric"
+                placeholder="TT.MM."
+                className="w-full bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] outline-none focus:border-[#2E6B3A] transition-colors"
+              />
+              <p className="text-[#7C7461] text-[11px] mt-1.5 leading-snug">
+                Nur Tag & Monat. In der Geburtstagswoche trägt der Spieler einen Lorbeerkranz. 🍻
+              </p>
             </div>
 
             {/* Active toggle */}

@@ -126,6 +126,7 @@ export default function GameTable({
                 size={avatar}
                 eliminated={isEliminated}
                 isWinner={isWinner}
+                birthday={player.birthday}
               />
               {dealerId === sp.player_id && (
                 <span

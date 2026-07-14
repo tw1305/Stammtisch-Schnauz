@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { computePlayerStats, computeSeasonAchievements, computeHeadToHead, computeBalanceTimeline } from '@/lib/stats'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
+import { formatBirthday } from '@/lib/birthday'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import BalanceSparkline from '@/components/ui/BalanceSparkline'
 import type { Player, PlayerStats, AchievementTally, HeadToHead, Season, SessionBalancePoint } from '@/types/database'
@@ -88,8 +89,11 @@ export default function PlayerDetailPage() {
 
       {/* Identity */}
       <div className="flex flex-col items-center gap-2 px-4 py-3">
-        <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} size={88} />
+        <PlayerAvatar name={player.name} avatarUrl={player.avatar_url} size={88} birthday={player.birthday} />
         <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#23201A]">{player.name}</h2>
+        {formatBirthday(player.birthday) && (
+          <span className="text-[#7C7461] text-sm -mt-1">🎂 {formatBirthday(player.birthday)}</span>
+        )}
         {stat && (
           <span className={`text-lg font-bold ${getBalanceColor(stat.total_balance)}`}>
             {formatBalance(stat.total_balance)} gesamt
