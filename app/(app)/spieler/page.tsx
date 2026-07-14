@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
 import AvatarCropper from '@/components/ui/AvatarCropper'
-import { formatBirthday, normalizeBirthday } from '@/lib/birthday'
+import { formatBirthday, normalizeBirthday, maskBirthdayInput } from '@/lib/birthday'
 import type { Player } from '@/types/database'
 
 function readFile(file: File): Promise<string> {
@@ -213,7 +213,7 @@ function PlayerEditor({
               <label className="block text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">Geburtstag (TT.MM.)</label>
               <input
                 value={birthday}
-                onChange={e => setBirthday(e.target.value)}
+                onChange={e => setBirthday(maskBirthdayInput(e.target.value))}
                 inputMode="numeric"
                 placeholder="TT.MM."
                 className="w-full bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl px-4 py-3 text-[#23201A] outline-none focus:border-[#2E6B3A] transition-colors"

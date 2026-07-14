@@ -29,6 +29,16 @@ export function formatBirthday(value: string | null | undefined): string {
 }
 
 /**
+ * Progressive input mask so a numeric keypad (no dot key) is enough:
+ * the dot is inserted automatically, e.g. "1407" → "14.07".
+ */
+export function maskBirthdayInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 4)
+  if (digits.length <= 2) return digits
+  return `${digits.slice(0, 2)}.${digits.slice(2)}`
+}
+
+/**
  * True during the 7-day window that starts on the player's birthday
  * (birthday itself + the following 6 days), year-agnostic and wrap-safe.
  */
