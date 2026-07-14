@@ -14,10 +14,11 @@ function polar(angleDeg: number, r: number): { x: number; y: number } {
 
 function buildBranch(side: 1 | -1): Leaf[] {
   const R = 40
-  const N = 12
+  const N = 11
   const gapHalf = 24
   const bottom = 90
-  const top = side === 1 ? -90 : 270 // both meet at the top
+  // Leave a matching gap at the top too, so beers can sit at both ends.
+  const top = side === 1 ? -90 + gapHalf : 270 - gapHalf
   const start = bottom - side * gapHalf
   const leaves: Leaf[] = []
   for (let k = 0; k < N; k++) {
@@ -73,8 +74,9 @@ export default function LaurelWreath({ className = '' }: { className?: string })
           return <circle key={`b${i}`} cx={p.x} cy={p.y} r="1.15" fill="#D9B24C" />
         })}
 
-        {/* Clinking beers at the bottom gap */}
+        {/* Clinking beers at both the bottom and top gaps */}
         <text x="50" y="90" textAnchor="middle" dominantBaseline="central" fontSize="15">🍻</text>
+        <text x="50" y="10" textAnchor="middle" dominantBaseline="central" fontSize="15">🍻</text>
       </svg>
     </div>
   )
