@@ -17,6 +17,8 @@ export function useSession() {
   const [roundPlayers, setRoundPlayers] = useState<RoundPlayer[]>([])
   const [loading, setLoading] = useState(true)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+  const [startingRound, setStartingRound] = useState(false)
+  const startingRef = useRef(false)
   const [completedRound, setCompletedRound] = useState<{
     round: Round
     players: RoundPlayer[]
@@ -170,43 +172,61 @@ export function useSession() {
 
   async function startRound(stake: number) {
     if (!session) return
+    // Guard against a rapid double tap (e.g. slow network) creating two rounds.
+    if (startingRef.current) return
+    startingRef.current = true
+    setStartingRound(true)
+    try {
+      // Safety net: never allow two active rounds in the same session. If one
+      // already exists (a previous tap actually went through), just resync to it.
+      const { data: existing } = await supabase
+        .from('rounds')
+        .select('id')
+        .eq('session_id', session.id)
+        .eq('status', 'active')
+        .limit(1)
+      if (existing && existing.length > 0) {
+        await loadActiveSession()
+        return
+      }
 
-    const { data: lastRound } = await supabase
-      .from('rounds')
-      .select('round_number')
-      .eq('session_id', session.id)
-      .order('round_number', { ascending: false })
-      .limit(1)
+      const { data: lastRound } = await supabase
+        .from('rounds')
+        .select('round_number')
+        .eq('session_id', session.id)
+        .order('round_number', { ascending: false })
+        .limit(1)
 
-    const roundNumber = lastRound && lastRound.length > 0 ? lastRound[0].round_number + 1 : 1
-    const activePlayerIds = sessionPlayers.map(sp => sp.player_id)
+      const roundNumber = lastRound && lastRound.length > 0 ? lastRound[0].round_number + 1 : 1
+      const activePlayerIds = sessionPlayers.map(sp => sp.player_id)
 
-    const { data: round, error } = await supabase
-      .from('rounds')
-      .insert({
-        session_id: session.id,
-        round_number: roundNumber,
-        stake,
-        player_count: activePlayerIds.length,
-        status: 'active',
-      })
-      .select()
-      .single()
+      const { data: round, error } = await supabase
+        .from('rounds')
+        .insert({
+          session_id: session.id,
+          round_number: roundNumber,
+          stake,
+          player_count: activePlayerIds.length,
+          status: 'active',
+        })
+        .select()
+        .single()
 
-    if (error || !round) return
+      // If a concurrent insert won (e.g. a DB uniqueness guard), resync instead of duplicating.
+      if (error || !round) {
+        await loadActiveSession()
+        return
+      }
 
-    const rpInserts = activePlayerIds.map(pid => ({ round_id: round.id, player_id: pid, is_active: true }))
-    await supabase.from('round_players').insert(rpInserts)
+      const rpInserts = activePlayerIds.map(pid => ({ round_id: round.id, player_id: pid, is_active: true }))
+      await supabase.from('round_players').insert(rpInserts)
 
-    // Advance dealer to the next seat (best-effort)
-    if (activePlayerIds.length > 0) {
-      const curIdx = activePlayerIds.indexOf(session.dealer_player_id ?? '')
-      const next = activePlayerIds[(curIdx + 1 + activePlayerIds.length) % activePlayerIds.length]
-      await supabase.from('sessions').update({ dealer_player_id: next }).eq('id', session.id)
+      setUndoStack([])
+      await loadActiveSession()
+    } finally {
+      startingRef.current = false
+      setStartingRound(false)
     }
-
-    setUndoStack([])
-    await loadActiveSession()
   }
 
   async function reloadRoundPlayers(roundId: string) {
@@ -323,6 +343,12 @@ export function useSession() {
       .update({ status: 'completed', winner_id: winnerId, ended_at: new Date().toISOString() })
       .eq('id', activeRound.id)
 
+    // The player who was first out this round deals the next one.
+    const firstOut = players.find(p => p.was_first_eliminated)
+    if (firstOut && session) {
+      await supabase.from('sessions').update({ dealer_player_id: firstOut.player_id }).eq('id', session.id)
+    }
+
     const { data: finalRp } = await supabase
       .from('round_players')
       .select('*, player:players(*)')
@@ -387,6 +413,7 @@ export function useSession() {
     loading,
     completedRound,
     canUndo: undoStack.length > 0,
+    startingRound,
     dealerId: session?.dealer_player_id ?? null,
     startSession,
     addPlayerToSession,

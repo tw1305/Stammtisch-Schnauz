@@ -50,44 +50,56 @@ export default function GameTable({
 
   return (
     <div className="relative w-full max-w-[380px] aspect-square mx-auto">
-      {/* Soft shadow under the table */}
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl pointer-events-none"
-        style={{ width: '54%', height: '54%', background: 'radial-gradient(circle, rgba(90,62,34,0.28), transparent 72%)' }}
-      />
+      {/* Soft shadow under the table — only while playing */}
+      {isRoundActive && (
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl pointer-events-none"
+          style={{ width: '54%', height: '54%', background: 'radial-gradient(circle, rgba(90,62,34,0.28), transparent 72%)' }}
+        />
+      )}
 
-      {/* Center table — oak plank */}
+      {/* Center — the oak table appears only while a round is being played, so
+          the setup screen is clearly distinguishable from an active round. */}
       <div
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{ width: '47%', height: '47%' }}
       >
-        <div
-          className="w-full h-full rounded-full flex flex-col items-center justify-center text-center"
-          style={{
-            backgroundColor: '#C29A5E',
-            backgroundImage: [
-              'radial-gradient(120% 120% at 35% 28%, rgba(255,244,222,0.55) 0%, rgba(255,244,222,0) 45%)',
-              'repeating-linear-gradient(96deg, rgba(120,80,40,0.16) 0px, rgba(120,80,40,0.16) 2px, rgba(120,80,40,0) 3px, rgba(120,80,40,0) 13px)',
-              'repeating-linear-gradient(96deg, rgba(80,52,24,0.20) 0px, rgba(80,52,24,0.20) 1px, rgba(80,52,24,0) 2px, rgba(80,52,24,0) 7px)',
-              'linear-gradient(96deg, #B8884E 0%, #CDA468 35%, #BD9156 65%, #A87B45 100%)',
-            ].join(', '),
-            border: '6px solid #6E4A24',
-            boxShadow:
-              'inset 0 2px 6px rgba(255,240,210,0.35), inset 0 -8px 18px rgba(60,38,16,0.45), 0 10px 26px rgba(54,34,14,0.45)',
-          }}
-        >
-          <span
-            className="font-[family-name:var(--font-display)] text-lg font-extrabold tracking-tight"
-            style={{ color: '#4A2E12', textShadow: '0 1px 0 rgba(255,238,210,0.45)' }}
+        {isRoundActive ? (
+          <div
+            className="w-full h-full rounded-full flex flex-col items-center justify-center text-center"
+            style={{
+              backgroundColor: '#C29A5E',
+              backgroundImage: [
+                'radial-gradient(120% 120% at 35% 28%, rgba(255,244,222,0.55) 0%, rgba(255,244,222,0) 45%)',
+                'repeating-linear-gradient(96deg, rgba(120,80,40,0.16) 0px, rgba(120,80,40,0.16) 2px, rgba(120,80,40,0) 3px, rgba(120,80,40,0) 13px)',
+                'repeating-linear-gradient(96deg, rgba(80,52,24,0.20) 0px, rgba(80,52,24,0.20) 1px, rgba(80,52,24,0) 2px, rgba(80,52,24,0) 7px)',
+                'linear-gradient(96deg, #B8884E 0%, #CDA468 35%, #BD9156 65%, #A87B45 100%)',
+              ].join(', '),
+              border: '6px solid #6E4A24',
+              boxShadow:
+                'inset 0 2px 6px rgba(255,240,210,0.35), inset 0 -8px 18px rgba(60,38,16,0.45), 0 10px 26px rgba(54,34,14,0.45)',
+            }}
           >
-            ♠ Schnauz
-          </span>
-          {isRoundActive && (
+            <span
+              className="font-[family-name:var(--font-display)] text-lg font-extrabold tracking-tight"
+              style={{ color: '#4A2E12', textShadow: '0 1px 0 rgba(255,238,210,0.45)' }}
+            >
+              ♠ Schnauz
+            </span>
             <span className="text-[10px] mt-1 px-4 leading-tight" style={{ color: '#5A3E22' }}>
               Tippen zum Ausscheiden
             </span>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="w-full h-full rounded-full flex flex-col items-center justify-center text-center border-2 border-dashed border-[#D8C9A6] bg-[#F4ECDA]/50">
+            <span className="font-[family-name:var(--font-display)] text-sm font-bold text-[#B0A084] tracking-tight">
+              ♠ Schnauz
+            </span>
+            <span className="text-[10px] mt-0.5 px-4 leading-tight text-[#B0A084]">
+              Runde noch nicht gestartet
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Players */}
@@ -141,14 +153,11 @@ export default function GameTable({
               >
                 {player.name}
               </span>
-              {!isRoundActive && (
-                <span className={`${balClass} font-bold leading-tight ${getBalanceColor(balance)}`}>
-                  {formatBalance(balance)}
-                </span>
-              )}
-              {isRoundActive && isEliminated && (
-                <span className="text-[10px] leading-none mt-0.5">💀</span>
-              )}
+              {/* Balance stays visible during play so the standings are always readable */}
+              <span className={`${balClass} font-bold leading-tight flex items-center gap-0.5 ${getBalanceColor(balance)}`}>
+                {isRoundActive && isEliminated && <span className="text-[10px]">💀</span>}
+                {formatBalance(balance)}
+              </span>
             </div>
           </button>
         )

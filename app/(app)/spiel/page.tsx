@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
 import GameTable from '@/components/ui/GameTable'
 import RoundResultModal from '@/components/ui/RoundResultModal'
-import SessionSummaryModal, { type SessionSummary } from '@/components/ui/SessionSummaryModal'
+import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndModal'
+import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
 import { feedbackEliminate, feedbackRevive, feedbackWinner } from '@/lib/feedback'
@@ -35,6 +36,7 @@ export default function SpielPage() {
     addPlayerToSession,
     removePlayerFromSession,
     startRound,
+    startingRound,
     eliminatePlayer,
     revivePlayer,
     undoLast,
@@ -58,7 +60,7 @@ export default function SpielPage() {
   const [sessionBalances, setSessionBalances] = useState<Record<string, number>>({})
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set())
   const [reviveTarget, setReviveTarget] = useState<string | null>(null)
-  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null)
+  const [endData, setEndData] = useState<{ session: SessionSummary; season: SeasonSummary | null } | null>(null)
 
   useEffect(() => {
     loadMeta()
@@ -198,13 +200,57 @@ export default function SpielPage() {
     return { rounds: roundIds.length, players: Object.values(map).sort((a, b) => b.balance - a.balance) }
   }
 
+  async function buildSeasonSummary(seasonId: string): Promise<SeasonSummary | null> {
+    const { data: season } = await supabase.from('seasons').select('*').eq('id', seasonId).single()
+    if (!season) return null
+
+    const { data: sessions } = await supabase.from('sessions').select('id').eq('season_id', seasonId)
+    const sessionIds = (sessions || []).map(s => s.id)
+    if (sessionIds.length === 0) return { name: season.name, startDate: season.start_date, players: [] }
+
+    const { data: rounds } = await supabase
+      .from('rounds')
+      .select('id')
+      .in('session_id', sessionIds)
+      .eq('status', 'completed')
+    const roundIds = (rounds || []).map(r => r.id)
+    if (roundIds.length === 0) return { name: season.name, startDate: season.start_date, players: [] }
+
+    const { data: rps } = await supabase
+      .from('round_players')
+      .select('player_id, balance_change, player:players(id, name, avatar_url, is_active, created_at)')
+      .in('round_id', roundIds)
+
+    const map: Record<string, { player: Player; total: number }> = {}
+    for (const rp of rps || []) {
+      const p = rp.player as unknown as Player
+      if (!p) continue
+      if (!map[rp.player_id]) map[rp.player_id] = { player: p, total: 0 }
+      if (rp.balance_change != null) map[rp.player_id].total += rp.balance_change
+    }
+    return { name: season.name, startDate: season.start_date, players: Object.values(map).sort((a, b) => b.total - a.total) }
+  }
+
+  // Shared end-of-session flow: build both overviews, close the session, show the modal.
+  async function endSessionFlow() {
+    if (!session) return
+    const sessionSummary = await buildSessionSummary(session.id)
+    const seasonSummary = activeSeason ? await buildSeasonSummary(activeSeason.id) : null
+    await endSession()
+    setEndData({ session: sessionSummary, season: seasonSummary })
+    reload()
+  }
+
   async function handleEndSession() {
     if (!session) return
     if (!confirm('Session wirklich beenden?')) return
-    const summary = await buildSessionSummary(session.id)
-    await endSession()
-    setSessionSummary(summary)
-    reload()
+    await endSessionFlow()
+  }
+
+  async function handleEndSessionFromResult() {
+    if (!confirm('Session wirklich beenden?')) return
+    dismissCompletedRound()
+    await endSessionFlow()
   }
 
   if (loading) {
@@ -274,8 +320,12 @@ export default function SpielPage() {
           </button>
         )}
 
-        {sessionSummary && (
-          <SessionSummaryModal summary={sessionSummary} onClose={() => setSessionSummary(null)} />
+        {endData && (
+          <SessionEndModal
+            sessionSummary={endData.session}
+            seasonSummary={endData.season}
+            onClose={() => setEndData(null)}
+          />
         )}
       </div>
     )
@@ -315,6 +365,7 @@ export default function SpielPage() {
           <GameTable
             sessionPlayers={sessionPlayers}
             roundPlayers={roundPlayers}
+            sessionBalances={sessionBalances}
             onPlayerTap={handlePlayerTap}
             isRoundActive={true}
             dealerId={dealerId}
@@ -437,10 +488,10 @@ export default function SpielPage() {
       <div className="px-4 space-y-2 pb-4">
         <button
           onClick={handleStartRound}
-          disabled={sessionPlayers.length < 2}
+          disabled={sessionPlayers.length < 2 || startingRound}
           className="w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-2xl py-4 text-base transition-colors"
         >
-          ▶ Neue Runde starten · {effectiveStake} €
+          {startingRound ? 'Runde wird gestartet…' : `▶ Neue Runde starten · ${effectiveStake} €`}
         </button>
         <button
           onClick={handleEndSession}
@@ -474,11 +525,16 @@ export default function SpielPage() {
             dismissCompletedRound()
             setShowPlayerManager(true)
           }}
+          onEndSession={handleEndSessionFromResult}
         />
       )}
 
-      {sessionSummary && (
-        <SessionSummaryModal summary={sessionSummary} onClose={() => setSessionSummary(null)} />
+      {endData && (
+        <SessionEndModal
+          sessionSummary={endData.session}
+          seasonSummary={endData.season}
+          onClose={() => setEndData(null)}
+        />
       )}
     </div>
   )

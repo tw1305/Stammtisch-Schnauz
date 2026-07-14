@@ -473,23 +473,61 @@ function RoundEditor({
   const [stake, setStake] = useState(String(round.stake))
   const [winnerId, setWinnerId] = useState<string | null>(round.winner_id)
   const [balances, setBalances] = useState<Record<string, string>>({})
+  const [beforeBalances, setBeforeBalances] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    supabase
-      .from('round_players')
-      .select('*, player:players(*)')
-      .eq('round_id', round.id)
-      .then(({ data }) => {
-        const rps = (data || []) as RoundPlayer[]
-        setParticipants(rps)
-        const bal: Record<string, string> = {}
-        rps.forEach(rp => { bal[rp.player_id] = String(rp.balance_change ?? 0) })
-        setBalances(bal)
-        setLoading(false)
-      })
-  }, [round.id, supabase])
+    let cancelled = false
+    async function load() {
+      const { data } = await supabase
+        .from('round_players')
+        .select('*, player:players(*)')
+        .eq('round_id', round.id)
+      const rps = (data || []) as RoundPlayer[]
+
+      // Season-wide cumulative balance entering this round: sum of every
+      // completed round in the season that happened before it.
+      const before: Record<string, number> = {}
+      const { data: sess } = await supabase
+        .from('sessions')
+        .select('season_id')
+        .eq('id', round.session_id)
+        .single()
+      if (sess?.season_id) {
+        const { data: sessions } = await supabase.from('sessions').select('id').eq('season_id', sess.season_id)
+        const sessionIds = (sessions || []).map(s => s.id)
+        if (sessionIds.length > 0) {
+          const { data: priorRounds } = await supabase
+            .from('rounds')
+            .select('id')
+            .in('session_id', sessionIds)
+            .eq('status', 'completed')
+            .lt('started_at', round.started_at)
+          const priorIds = (priorRounds || []).map(r => r.id).filter(id => id !== round.id)
+          if (priorIds.length > 0) {
+            const { data: priorRps } = await supabase
+              .from('round_players')
+              .select('player_id, balance_change')
+              .in('round_id', priorIds)
+            for (const rp of priorRps || []) {
+              if (rp.balance_change != null) before[rp.player_id] = (before[rp.player_id] ?? 0) + rp.balance_change
+            }
+          }
+        }
+      }
+
+      if (cancelled) return
+      setParticipants(rps)
+      const bal: Record<string, string> = {}
+      rps.forEach(rp => { bal[rp.player_id] = String(rp.balance_change ?? 0) })
+      setBalances(bal)
+      setBeforeBalances(before)
+      setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [round.id, round.session_id, round.started_at, supabase])
 
   async function save() {
     setSaving(true)
@@ -513,6 +551,16 @@ function RoundEditor({
     setSaving(false)
     onSaved()
   }
+
+  // Live preview of each participant's balance change for this round.
+  const stakeNum = Math.max(0, parseInt(stake) || 0)
+  const { winnerGain, loserLoss } = calculateBalances(round.player_count, stakeNum)
+  const liveDelta = (rp: RoundPlayer): number =>
+    isCarryOver
+      ? parseInt(balances[rp.player_id]) || 0
+      : rp.player_id === winnerId
+        ? winnerGain
+        : loserLoss
 
   return (
     <Portal>
@@ -582,6 +630,40 @@ function RoundEditor({
                 </div>
               </>
             )}
+
+            {/* Balances before / after this round */}
+            <div>
+              <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium">
+                Salden vor / nach dieser Runde
+              </p>
+              <div className="rounded-xl border border-[#E4D9BF] overflow-hidden">
+                <div className="grid grid-cols-[1fr_4rem_3.25rem_4rem] gap-x-2 items-center px-3 py-1.5 bg-[#FFFDF7] border-b border-[#E4D9BF] text-[10px] uppercase tracking-wider text-[#7C7461]">
+                  <span>Spieler</span>
+                  <span className="text-right">Vorher</span>
+                  <span className="text-right">Δ</span>
+                  <span className="text-right">Nachher</span>
+                </div>
+                {participants.map(rp => {
+                  const before = beforeBalances[rp.player_id] ?? 0
+                  const delta = liveDelta(rp)
+                  const after = before + delta
+                  return (
+                    <div
+                      key={rp.id}
+                      className="grid grid-cols-[1fr_4rem_3.25rem_4rem] gap-x-2 items-center px-3 py-2 border-b border-[#E4D9BF] last:border-0"
+                    >
+                      <span className="text-[#23201A] text-sm truncate">{rp.player?.name}</span>
+                      <span className="text-[11px] tabular-nums text-right text-[#7C7461]">{formatBalance(before)}</span>
+                      <span className={`text-[11px] tabular-nums text-right ${getBalanceColor(delta)}`}>{formatBalance(delta)}</span>
+                      <span className={`text-sm font-bold tabular-nums text-right ${getBalanceColor(after)}`}>{formatBalance(after)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="text-[#7C7461] text-[11px] mt-1.5 leading-snug">
+                Saison-Saldo vor der Runde und danach – aktualisiert sich live mit den Änderungen oben.
+              </p>
+            </div>
           </div>
         )}
 

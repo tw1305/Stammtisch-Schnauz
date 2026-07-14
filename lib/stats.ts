@@ -55,7 +55,13 @@ export async function computePlayerStats(
   const statsMap: Record<string, PlayerStats> = {}
   for (const p of players) statsMap[p.id] = emptyStats(p)
 
-  if (rounds.length === 0) return Object.values(statsMap)
+  // When scoped to a single season, only surface players who actually played
+  // at least one real round in it (not every player who ever joined a session).
+  const scoped = opts.seasonId != null && opts.seasonId !== 'all'
+  const finalize = (list: PlayerStats[]) =>
+    scoped ? list.filter(s => s.rounds_played >= 1) : list
+
+  if (rounds.length === 0) return finalize(Object.values(statsMap))
 
   const roundMeta: Record<string, { round_number: number; winner_id: string | null; started_at: string }> = {}
   for (const r of rounds) roundMeta[r.id] = r
@@ -120,7 +126,7 @@ export async function computePlayerStats(
     s.win_rate = s.rounds_played > 0 ? s.wins / s.rounds_played : 0
   }
 
-  return Object.values(statsMap).sort((a, b) => b.total_balance - a.total_balance)
+  return finalize(Object.values(statsMap).sort((a, b) => b.total_balance - a.total_balance))
 }
 
 /**
