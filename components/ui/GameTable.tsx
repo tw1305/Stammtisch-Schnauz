@@ -25,6 +25,31 @@ function sizingFor(count: number): Sizing {
   return { avatar: 56, name: 'text-[11px]', bal: 'text-[10px]', radius: 41 }
 }
 
+// Seat ellipse fitted to the four tree-stump seats drawn in table-active-bg.png
+// (cx/cy/rx/ry in % of the square container). The image's stumps sit at the
+// diagonals, so the angle offset starts a quarter-turn later than the setup circle.
+// Only 4 seats are actually drawn — beyond that we scale the ellipse outward into
+// the surrounding clearing (capped so nobody drifts into the treeline or off the edge).
+const ACTIVE_TABLE = { cx: 50, cy: 72, rx: 34, ry: 12 }
+
+function activeScaleFor(count: number): number {
+  if (count <= 4) return 1
+  return Math.min(1 + (count - 4) * 0.09, 1.35)
+}
+
+type ActiveSizing = { avatar: number; name: string; bal: string; minW: number; maxW: number }
+
+function activeSizingFor(count: number): ActiveSizing {
+  if (count <= 2) return { avatar: 96, name: 'text-sm', bal: 'text-sm', minW: 58, maxW: 104 }
+  if (count === 3) return { avatar: 82, name: 'text-sm', bal: 'text-xs', minW: 56, maxW: 100 }
+  if (count === 4) return { avatar: 64, name: 'text-xs', bal: 'text-xs', minW: 52, maxW: 92 }
+  if (count === 5) return { avatar: 58, name: 'text-xs', bal: 'text-[11px]', minW: 50, maxW: 88 }
+  if (count === 6) return { avatar: 54, name: 'text-[11px]', bal: 'text-[11px]', minW: 48, maxW: 84 }
+  if (count === 7) return { avatar: 48, name: 'text-[11px]', bal: 'text-[10px]', minW: 44, maxW: 78 }
+  if (count === 8) return { avatar: 46, name: 'text-[10px]', bal: 'text-[10px]', minW: 42, maxW: 72 }
+  return { avatar: 42, name: 'text-[10px]', bal: 'text-[9px]', minW: 40, maxW: 68 }
+}
+
 export default function GameTable({
   sessionPlayers,
   roundPlayers = [],
@@ -34,9 +59,24 @@ export default function GameTable({
   dealerId = null,
 }: GameTableProps) {
   const count = sessionPlayers.length
-  const { avatar, name: nameClass, bal: balClass, radius } = sizingFor(count)
+  const base = sizingFor(count)
+  const active = isRoundActive ? activeSizingFor(count) : null
+  const avatar = active?.avatar ?? base.avatar
+  const nameClass = active?.name ?? base.name
+  const balClass = active?.bal ?? base.bal
+  const minW = active?.minW ?? 58
+  const maxW = active?.maxW ?? 104
+  const { radius } = base
 
   const positions = Array.from({ length: count }, (_, i) => {
+    if (isRoundActive) {
+      const scale = activeScaleFor(count)
+      const angle = (2 * Math.PI * i) / count - Math.PI / 4
+      return {
+        left: ACTIVE_TABLE.cx + ACTIVE_TABLE.rx * scale * Math.cos(angle),
+        top: ACTIVE_TABLE.cy + ACTIVE_TABLE.ry * scale * Math.sin(angle),
+      }
+    }
     const angle = (2 * Math.PI * i) / count - Math.PI / 2
     return {
       left: 50 + radius * Math.cos(angle),
@@ -50,57 +90,28 @@ export default function GameTable({
 
   return (
     <div className="relative w-full max-w-[380px] aspect-square mx-auto">
-      {/* Soft shadow under the table — only while playing */}
-      {isRoundActive && (
-        <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl pointer-events-none"
-          style={{ width: '54%', height: '54%', background: 'radial-gradient(circle, rgba(90,62,34,0.28), transparent 72%)' }}
-        />
-      )}
-
-      {/* Center — the oak table appears only while a round is being played, so
+      {/* Center — the illustrated table appears only while a round is being played, so
           the setup screen is clearly distinguishable from an active round. */}
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{ width: '47%', height: '47%' }}
-      >
-        {isRoundActive ? (
-          <div
-            className="w-full h-full rounded-full flex flex-col items-center justify-center text-center"
-            style={{
-              backgroundColor: '#C29A5E',
-              backgroundImage: [
-                'radial-gradient(120% 120% at 35% 28%, rgba(255,244,222,0.55) 0%, rgba(255,244,222,0) 45%)',
-                'repeating-linear-gradient(96deg, rgba(120,80,40,0.16) 0px, rgba(120,80,40,0.16) 2px, rgba(120,80,40,0) 3px, rgba(120,80,40,0) 13px)',
-                'repeating-linear-gradient(96deg, rgba(80,52,24,0.20) 0px, rgba(80,52,24,0.20) 1px, rgba(80,52,24,0) 2px, rgba(80,52,24,0) 7px)',
-                'linear-gradient(96deg, #B8884E 0%, #CDA468 35%, #BD9156 65%, #A87B45 100%)',
-              ].join(', '),
-              border: '6px solid #6E4A24',
-              boxShadow:
-                'inset 0 2px 6px rgba(255,240,210,0.35), inset 0 -8px 18px rgba(60,38,16,0.45), 0 10px 26px rgba(54,34,14,0.45)',
-            }}
-          >
-            <span
-              className="font-[family-name:var(--font-display)] text-lg font-extrabold tracking-tight"
-              style={{ color: '#4A2E12', textShadow: '0 1px 0 rgba(255,238,210,0.45)' }}
-            >
-              ♠ Schnauz
-            </span>
-            <span className="text-[10px] mt-1 px-4 leading-tight" style={{ color: '#5A3E22' }}>
-              Tippen zum Ausscheiden
-            </span>
-          </div>
-        ) : (
-          <div className="w-full h-full rounded-full flex flex-col items-center justify-center text-center border-2 border-dashed border-[#D8C9A6] bg-[#F4ECDA]/50">
-            <span className="font-[family-name:var(--font-display)] text-sm font-bold text-[#B0A084] tracking-tight">
-              ♠ Schnauz
-            </span>
-            <span className="text-[10px] mt-0.5 px-4 leading-tight text-[#B0A084]">
-              Runde noch nicht gestartet
-            </span>
-          </div>
-        )}
-      </div>
+      {isRoundActive ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/table-active-bg.png"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover rounded-3xl border border-[#E4D9BF] shadow-sm"
+        />
+      ) : (
+        <div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full flex flex-col items-center justify-center text-center border-2 border-dashed border-[#D8C9A6] bg-[#F4ECDA]/50"
+          style={{ width: '47%', height: '47%' }}
+        >
+          <span className="font-[family-name:var(--font-display)] text-sm font-bold text-[#B0A084] tracking-tight">
+            ♠ Schnauz
+          </span>
+          <span className="text-[10px] mt-0.5 px-4 leading-tight text-[#B0A084]">
+            Runde noch nicht gestartet
+          </span>
+        </div>
+      )}
 
       {/* Players */}
       {sessionPlayers.map((sp, i) => {
@@ -139,13 +150,14 @@ export default function GameTable({
             </div>
             {/* Name plate — ties avatar, name and balance into one token */}
             <div
-              className={`-mt-2.5 px-2.5 py-1 rounded-xl border shadow-sm flex flex-col items-center min-w-[58px] max-w-[104px] relative z-10
+              className={`-mt-2.5 px-2.5 py-1 rounded-xl border shadow-sm flex flex-col items-center relative z-10
                 ${isEliminated
                   ? 'bg-[#F0E8D6] border-[#E4D9BF] opacity-60'
                   : isWinner
                     ? 'bg-[#FFFDF7] border-[#2E6B3A]'
                     : 'bg-[#FFFDF7] border-[#E4D9BF]'}
               `}
+              style={{ minWidth: minW, maxWidth: maxW }}
             >
               <span
                 className={`${nameClass} font-semibold leading-tight truncate max-w-full
