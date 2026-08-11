@@ -26,11 +26,16 @@ function sizingFor(count: number): Sizing {
 }
 
 // Seat ellipse fitted to the four tree-stump seats drawn in table-active-bg.png
-// (cx/cy/rx/ry in % of the square container). The image's stumps sit at the
-// diagonals, so the angle offset starts a quarter-turn later than the setup circle.
-// Only 4 seats are actually drawn — beyond that we scale the ellipse outward into
-// the surrounding clearing (capped so nobody drifts into the treeline or off the edge).
-const ACTIVE_TABLE = { cx: 50, cy: 72, rx: 34, ry: 12 }
+// (cx/cy/rx/ry in % of the container). The image's stumps sit at the diagonals, so
+// the angle offset starts a quarter-turn later than the setup circle.
+// PROVISIONAL: table-active-bg.png is still the old 1:1 square image (4 stumps),
+// rendered here inside a taller 2:3 box via object-cover, which crops ~17% off each
+// side — rx is widened to compensate so the 4 seats still line up with the stumps.
+// Once the new 9-stump image (native 2:3, see chat) lands, refit rx/cy/ry to it directly.
+const ACTIVE_TABLE = { cx: 50, cy: 72, rx: 52, ry: 12 }
+// Hard safety bounds so seats can never drift into the treeline or off the box,
+// regardless of player count or how ACTIVE_TABLE ends up tuned.
+const ACTIVE_BOUNDS = { left: [4, 96] as [number, number], top: [50, 92] as [number, number] }
 
 function activeScaleFor(count: number): number {
   if (count <= 4) return 1
@@ -72,9 +77,11 @@ export default function GameTable({
     if (isRoundActive) {
       const scale = activeScaleFor(count)
       const angle = (2 * Math.PI * i) / count - Math.PI / 4
+      const rawLeft = ACTIVE_TABLE.cx + ACTIVE_TABLE.rx * scale * Math.cos(angle)
+      const rawTop = ACTIVE_TABLE.cy + ACTIVE_TABLE.ry * scale * Math.sin(angle)
       return {
-        left: ACTIVE_TABLE.cx + ACTIVE_TABLE.rx * scale * Math.cos(angle),
-        top: ACTIVE_TABLE.cy + ACTIVE_TABLE.ry * scale * Math.sin(angle),
+        left: Math.min(ACTIVE_BOUNDS.left[1], Math.max(ACTIVE_BOUNDS.left[0], rawLeft)),
+        top: Math.min(ACTIVE_BOUNDS.top[1], Math.max(ACTIVE_BOUNDS.top[0], rawTop)),
       }
     }
     const angle = (2 * Math.PI * i) / count - Math.PI / 2
@@ -89,7 +96,13 @@ export default function GameTable({
   }
 
   return (
-    <div className="relative w-full max-w-[380px] aspect-square mx-auto">
+    <div
+      className={
+        isRoundActive
+          ? 'relative w-full aspect-[2/3] max-h-[64vh] mx-auto'
+          : 'relative w-full max-w-[380px] aspect-square mx-auto'
+      }
+    >
       {/* Center — the illustrated table appears only while a round is being played, so
           the setup screen is clearly distinguishable from an active round. */}
       {isRoundActive ? (
