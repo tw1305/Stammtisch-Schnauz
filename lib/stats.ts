@@ -17,13 +17,25 @@ function emptyStats(player: Player): PlayerStats {
     win_rate: 0,
     total_balance: 0,
     balance_history: [],
+    peak_balance: 0,
+    low_balance: 0,
+    high_stake_score: 0,
+    base_stake_wins: 0,
   }
 }
+
+/**
+ * The "simple round" stake. Rounds at or below it are the everyday rounds that
+ * feed Kleinvieh; anything above counts towards High Roller. Kept as a constant
+ * because `rounds.stake` stores absolute €, while the configurable base stake
+ * only lives in localStorage (and has always been 3 € in practice).
+ */
+const BASE_STAKE = 3
 
 async function roundIdsForScope(supabase: Supa, seasonId?: string | null) {
   let query = supabase
     .from('rounds')
-    .select('id, round_number, winner_id, started_at')
+    .select('id, round_number, winner_id, started_at, stake')
     .eq('status', 'completed')
 
   if (seasonId && seasonId !== 'all') {
@@ -34,7 +46,13 @@ async function roundIdsForScope(supabase: Supa, seasonId?: string | null) {
   }
 
   const { data } = await query
-  return (data || []) as { id: string; round_number: number; winner_id: string | null; started_at: string }[]
+  return (data || []) as {
+    id: string
+    round_number: number
+    winner_id: string | null
+    started_at: string
+    stake: number
+  }[]
 }
 
 /**
@@ -63,7 +81,10 @@ export async function computePlayerStats(
 
   if (rounds.length === 0) return finalize(Object.values(statsMap))
 
-  const roundMeta: Record<string, { round_number: number; winner_id: string | null; started_at: string }> = {}
+  const roundMeta: Record<
+    string,
+    { round_number: number; winner_id: string | null; started_at: string; stake: number }
+  > = {}
   for (const r of rounds) roundMeta[r.id] = r
   const roundIds = rounds.map(r => r.id)
 
@@ -79,6 +100,11 @@ export async function computePlayerStats(
     const meta = roundMeta[rp.round_id]
     const isReal = meta && meta.round_number > 0
     if (rp.is_winner) s.wins++
+    if (rp.is_winner && isReal) {
+      // A win is worth its stake, so one 15 € round outweighs several 3 € ones.
+      if (meta.stake > BASE_STAKE) s.high_stake_score += meta.stake
+      else s.base_stake_wins++
+    }
     if (rp.was_first_eliminated) s.first_eliminations++
     if (rp.was_revived) s.revivals++
     s.revives_given += rp.revives_given ?? 0
@@ -121,6 +147,9 @@ export async function computePlayerStats(
       }
     }
     s.balance_history = history
+    // Mario-Party-style: the best/worst standing ever held, not just the final one.
+    s.peak_balance = history.length > 0 ? Math.max(...history) : 0
+    s.low_balance = history.length > 0 ? Math.min(...history) : 0
     s.longest_streak = longest
     s.win_streak = cur // trailing streak over participated real rounds
     s.win_rate = s.rounds_played > 0 ? s.wins / s.rounds_played : 0
@@ -140,13 +169,17 @@ export const ACHIEVEMENTS: {
   min: number
   pick: (s: PlayerStats) => number
 }[] = [
-  { icon: '💰', label: 'Krösus', desc: 'Höchste Gesamtbilanz der Season', min: 1, pick: s => s.total_balance },
+  { icon: '💰', label: 'Bonze', desc: 'Höchste Gesamtbilanz der Season', min: 1, pick: s => s.total_balance },
+  { icon: '🌟', label: 'Münzstern', desc: 'Höchster Saldo, der in der Season je erreicht wurde', min: 1, pick: s => s.peak_balance },
+  { icon: '💩', label: 'Kotstern', desc: 'Tiefster Saldo, der in der Season je erreicht wurde', min: 1, pick: s => -s.low_balance },
   { icon: '🎯', label: 'Stammgast', desc: 'Meiste gespielte Runden der Season', min: 1, pick: s => s.rounds_played },
   { icon: '🏆', label: 'Seriensieger', desc: 'Meiste Rundensiege der Season', min: 1, pick: s => s.wins },
-  { icon: '🔥', label: 'Heißlauf', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
+  { icon: '🎲', label: 'High Roller', desc: `Höchster €-Wert gewonnener Runden über ${BASE_STAKE} € Einsatz`, min: 1, pick: s => s.high_stake_score },
+  { icon: '🐜', label: 'Kleinvieh', desc: `Meiste gewonnene ${BASE_STAKE}-€-Runden der Season`, min: 1, pick: s => s.base_stake_wins },
+  { icon: '🔥', label: 'Hot Streak', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
   { icon: '🐦', label: 'Phönix', desc: 'In der Season am häufigsten wiederbelebt', min: 1, pick: s => s.revivals },
-  { icon: '🤝', label: 'Lebensretter', desc: 'Hat in der Season am häufigsten andere belebt', min: 1, pick: s => s.revives_given },
-  { icon: '💀', label: 'Pechvogel', desc: 'In der Season am häufigsten zuerst raus', min: 1, pick: s => s.first_eliminations },
+  { icon: '🚑', label: 'Medic', desc: 'Hat in der Season am häufigsten andere belebt', min: 1, pick: s => s.revives_given },
+  { icon: '💀', label: 'Noob', desc: 'In der Season am häufigsten zuerst raus', min: 1, pick: s => s.first_eliminations },
 ]
 
 /** Relative achievements across the given stat set. Awards to all tied leaders. */

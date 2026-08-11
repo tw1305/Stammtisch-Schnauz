@@ -82,6 +82,10 @@ export type PlayerStats = {
   win_rate: number // 0..1
   total_balance: number
   balance_history: number[] // cumulative balance over completed rounds (chronological)
+  peak_balance: number // best cumulative balance ever reached in scope (Münzstern)
+  low_balance: number // worst cumulative balance ever reached in scope (Kotstern)
+  high_stake_score: number // € summed over won rounds above the base stake (High Roller)
+  base_stake_wins: number // won rounds at the base stake (Kleinvieh)
 }
 
 export type Badge = {
