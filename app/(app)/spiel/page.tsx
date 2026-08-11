@@ -20,6 +20,7 @@ const STAKE_OPTIONS = [
   { label: 'Quattro', multiplier: 4 },
   { label: 'Quinto', multiplier: 5 },
   { label: 'Sesto', multiplier: 6 },
+  { label: 'Settimo', multiplier: 7 },
 ]
 
 const DEFAULT_PLAYERS = ['Domi', 'Tom', 'André']

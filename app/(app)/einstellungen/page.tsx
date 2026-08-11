@@ -79,7 +79,8 @@ export default function EinstellungenPage() {
           </div>
           <p className="text-[#7C7461] text-xs mt-2 leading-relaxed">
             Einsatz-Optionen beim Rundenstart: {defaultStake} € · {defaultStake * 2} € · {defaultStake * 3} € ·{' '}
-            {defaultStake * 4} € · {defaultStake * 5} € · {defaultStake * 6} € (oder eigener Betrag)
+            {defaultStake * 4} € · {defaultStake * 5} € · {defaultStake * 6} € · {defaultStake * 7} € (oder eigener
+            Betrag)
           </p>
         </div>
 
