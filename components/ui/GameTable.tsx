@@ -25,34 +25,48 @@ function sizingFor(count: number): Sizing {
   return { avatar: 56, name: 'text-[11px]', bal: 'text-[10px]', radius: 41 }
 }
 
-// Seat ellipse fitted to the four tree-stump seats drawn in table-active-bg.png
-// (cx/cy/rx/ry in % of the container). The image's stumps sit at the diagonals, so
-// the angle offset starts a quarter-turn later than the setup circle.
-// PROVISIONAL: table-active-bg.png is still the old 1:1 square image (4 stumps),
-// rendered here inside a taller 2:3 box via object-cover, which crops ~17% off each
-// side — rx is widened to compensate so the 4 seats still line up with the stumps.
-// Once the new 9-stump image (native 2:3, see chat) lands, refit rx/cy/ry to it directly.
-const ACTIVE_TABLE = { cx: 50, cy: 72, rx: 52, ry: 12 }
-// Hard safety bounds so seats can never drift into the treeline or off the box,
-// regardless of player count or how ACTIVE_TABLE ends up tuned.
-const ACTIVE_BOUNDS = { left: [4, 96] as [number, number], top: [50, 92] as [number, number] }
+// Exact seat centers (% of the container) measured directly off the 10 tree-stump
+// seats drawn in table-active-bg.png (1024×1536, native 2:3 — no cropping needed).
+// Ordered clockwise starting at the top stump. For fewer players we sample this
+// list evenly by index so the used seats stay spread around the table instead of
+// clustering on one side.
+const ACTIVE_SEATS: { left: number; top: number }[] = [
+  { left: 48.8, top: 38.4 }, // back, top-center
+  { left: 67.9, top: 40.2 }, // back-right
+  { left: 84.0, top: 47.5 }, // right
+  { left: 86.4, top: 57.9 }, // right, lower
+  { left: 71.3, top: 67.9 }, // front-right
+  { left: 46.2, top: 70.8 }, // front, bottom-center
+  { left: 22.3, top: 68.2 }, // front-left
+  { left: 12.2, top: 56.6 }, // left, lower
+  { left: 15.9, top: 46.2 }, // left
+  { left: 31.7, top: 39.9 }, // back-left
+]
+
+// Fallback for the rare session with more players than drawn seats (11+): grows an
+// ellipse (fitted to the same 10 seats) outward into the surrounding clearing,
+// clamped so nobody drifts into the treeline or off the image.
+const ACTIVE_TABLE = { cx: 48.7, cy: 53.4, rx: 37.3, ry: 16.9 }
+const ACTIVE_BOUNDS = { left: [4, 96] as [number, number], top: [36, 74] as [number, number] }
 
 function activeScaleFor(count: number): number {
-  if (count <= 4) return 1
-  return Math.min(1 + (count - 4) * 0.09, 1.35)
+  if (count <= ACTIVE_SEATS.length) return 1
+  return Math.min(1 + (count - ACTIVE_SEATS.length) * 0.12, 1.3)
 }
 
 type ActiveSizing = { avatar: number; name: string; bal: string; minW: number; maxW: number }
 
 function activeSizingFor(count: number): ActiveSizing {
-  if (count <= 2) return { avatar: 96, name: 'text-sm', bal: 'text-sm', minW: 58, maxW: 104 }
-  if (count === 3) return { avatar: 82, name: 'text-sm', bal: 'text-xs', minW: 56, maxW: 100 }
-  if (count === 4) return { avatar: 64, name: 'text-xs', bal: 'text-xs', minW: 52, maxW: 92 }
-  if (count === 5) return { avatar: 58, name: 'text-xs', bal: 'text-[11px]', minW: 50, maxW: 88 }
-  if (count === 6) return { avatar: 54, name: 'text-[11px]', bal: 'text-[11px]', minW: 48, maxW: 84 }
-  if (count === 7) return { avatar: 48, name: 'text-[11px]', bal: 'text-[10px]', minW: 44, maxW: 78 }
-  if (count === 8) return { avatar: 46, name: 'text-[10px]', bal: 'text-[10px]', minW: 42, maxW: 72 }
-  return { avatar: 42, name: 'text-[10px]', bal: 'text-[9px]', minW: 40, maxW: 68 }
+  if (count <= 2) return { avatar: 100, name: 'text-sm', bal: 'text-sm', minW: 58, maxW: 104 }
+  if (count === 3) return { avatar: 88, name: 'text-sm', bal: 'text-xs', minW: 54, maxW: 96 }
+  if (count === 4) return { avatar: 72, name: 'text-xs', bal: 'text-xs', minW: 48, maxW: 84 }
+  if (count === 5) return { avatar: 62, name: 'text-xs', bal: 'text-[11px]', minW: 44, maxW: 76 }
+  if (count === 6) return { avatar: 52, name: 'text-[11px]', bal: 'text-[11px]', minW: 40, maxW: 68 }
+  if (count === 7) return { avatar: 46, name: 'text-[11px]', bal: 'text-[10px]', minW: 38, maxW: 62 }
+  if (count === 8) return { avatar: 42, name: 'text-[10px]', bal: 'text-[10px]', minW: 36, maxW: 58 }
+  if (count === 9) return { avatar: 40, name: 'text-[10px]', bal: 'text-[9px]', minW: 34, maxW: 56 }
+  if (count === 10) return { avatar: 38, name: 'text-[9px]', bal: 'text-[9px]', minW: 32, maxW: 52 }
+  return { avatar: 34, name: 'text-[9px]', bal: 'text-[8px]', minW: 30, maxW: 48 }
 }
 
 export default function GameTable({
@@ -75,8 +89,16 @@ export default function GameTable({
 
   const positions = Array.from({ length: count }, (_, i) => {
     if (isRoundActive) {
+      if (count <= ACTIVE_SEATS.length) {
+        // Evenly sample the 10 measured seats by index so N players stay spread
+        // around the table instead of clustering on consecutive drawn stumps.
+        const seat = ACTIVE_SEATS[Math.floor((i * ACTIVE_SEATS.length) / count)]
+        return { left: seat.left, top: seat.top }
+      }
+      // More players than drawn seats — grow the fitted ellipse outward, clamped
+      // to stay on the visible ground.
       const scale = activeScaleFor(count)
-      const angle = (2 * Math.PI * i) / count - Math.PI / 4
+      const angle = (2 * Math.PI * i) / count - Math.PI / 2
       const rawLeft = ACTIVE_TABLE.cx + ACTIVE_TABLE.rx * scale * Math.cos(angle)
       const rawTop = ACTIVE_TABLE.cy + ACTIVE_TABLE.ry * scale * Math.sin(angle)
       return {
