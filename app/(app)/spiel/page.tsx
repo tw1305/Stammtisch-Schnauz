@@ -10,6 +10,7 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
+import { computeSessionSummary } from '@/lib/stats'
 import { feedbackEliminate, feedbackRevive, feedbackWinner } from '@/lib/feedback'
 import type { Season, Player, RoundPlayer, SessionPlayer } from '@/types/database'
 
@@ -177,32 +178,6 @@ export default function SpielPage() {
     }
   }
 
-  async function buildSessionSummary(sessionId: string): Promise<SessionSummary> {
-    const { data: rounds } = await supabase
-      .from('rounds')
-      .select('id')
-      .eq('session_id', sessionId)
-      .eq('status', 'completed')
-      .gt('round_number', 0)
-    const roundIds = (rounds || []).map(r => r.id)
-    if (roundIds.length === 0) return { rounds: 0, players: [] }
-
-    const { data: rps } = await supabase
-      .from('round_players')
-      .select('player_id, balance_change, is_winner, player:players(id, name, avatar_url, is_active, created_at)')
-      .in('round_id', roundIds)
-
-    const map: Record<string, { player: Player; balance: number; wins: number }> = {}
-    for (const rp of rps || []) {
-      const p = rp.player as unknown as Player
-      if (!p) continue
-      if (!map[rp.player_id]) map[rp.player_id] = { player: p, balance: 0, wins: 0 }
-      if (rp.balance_change != null) map[rp.player_id].balance += rp.balance_change
-      if (rp.is_winner) map[rp.player_id].wins++
-    }
-    return { rounds: roundIds.length, players: Object.values(map).sort((a, b) => b.balance - a.balance) }
-  }
-
   async function buildSeasonSummary(seasonId: string): Promise<SeasonSummary | null> {
     const { data: season } = await supabase.from('seasons').select('*').eq('id', seasonId).single()
     if (!season) return null
@@ -237,7 +212,7 @@ export default function SpielPage() {
   // Shared end-of-session flow: build both overviews, close the session, show the modal.
   async function endSessionFlow() {
     if (!session) return
-    const sessionSummary = await buildSessionSummary(session.id)
+    const sessionSummary = await computeSessionSummary(supabase, session.id)
     const seasonSummary = activeSeason ? await buildSeasonSummary(activeSeason.id) : null
     await endSession()
     setEndData({ session: sessionSummary, season: seasonSummary })

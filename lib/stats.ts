@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Player, PlayerStats, Badge, HeadToHead, Session, SessionBalancePoint, AchievementTally } from '@/types/database'
+import type { Player, PlayerStats, Badge, HeadToHead, Session, SessionBalancePoint, AchievementTally, SessionSummary } from '@/types/database'
 
 type Supa = SupabaseClient
 
@@ -230,6 +230,40 @@ export async function computeSeasonAchievements(
     }))
   }
   return result
+}
+
+/**
+ * Scoreboard for a single session: € balance and wins per player over its
+ * completed real rounds (the Saldovortrag round 0 is excluded). Shared by the
+ * end-of-session flow and the season overview's session review.
+ */
+export async function computeSessionSummary(
+  supabase: Supa,
+  sessionId: string
+): Promise<SessionSummary> {
+  const { data: rounds } = await supabase
+    .from('rounds')
+    .select('id')
+    .eq('session_id', sessionId)
+    .eq('status', 'completed')
+    .gt('round_number', 0)
+  const roundIds = (rounds || []).map(r => r.id)
+  if (roundIds.length === 0) return { rounds: 0, players: [] }
+
+  const { data: rps } = await supabase
+    .from('round_players')
+    .select('player_id, balance_change, is_winner, player:players(id, name, avatar_url, is_active, created_at)')
+    .in('round_id', roundIds)
+
+  const map: Record<string, { player: Player; balance: number; wins: number }> = {}
+  for (const rp of rps || []) {
+    const p = rp.player as unknown as Player
+    if (!p) continue
+    if (!map[rp.player_id]) map[rp.player_id] = { player: p, balance: 0, wins: 0 }
+    if (rp.balance_change != null) map[rp.player_id].balance += rp.balance_change
+    if (rp.is_winner) map[rp.player_id].wins++
+  }
+  return { rounds: roundIds.length, players: Object.values(map).sort((a, b) => b.balance - a.balance) }
 }
 
 /**

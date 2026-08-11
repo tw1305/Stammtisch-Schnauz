@@ -9,8 +9,10 @@ import {
   formatBalance,
   getBalanceColor,
 } from '@/lib/game-logic'
-import type { Season, Player, DebtSettlement, Session, Round, RoundPlayer } from '@/types/database'
+import type { Season, Player, DebtSettlement, Session, Round, RoundPlayer, SessionSummary } from '@/types/database'
+import { computeSessionSummary } from '@/lib/stats'
 import Portal from '@/components/ui/Portal'
+import SessionSummaryModal from '@/components/ui/SessionSummaryModal'
 
 type SeasonWithStats = Season & { roundCount: number; avgStake: number }
 type SessionWithRounds = { session: Session; rounds: Round[] }
@@ -29,6 +31,7 @@ export default function SeasonsPage() {
   const [editingRound, setEditingRound] = useState<Round | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const [reviewedSession, setReviewedSession] = useState<{ title: string; summary: SessionSummary } | null>(null)
 
   useEffect(() => { loadSeasons() }, [])
 
@@ -173,6 +176,12 @@ export default function SeasonsPage() {
     setSettlements(calculateSettlements(bals))
   }
 
+  async function openSessionReview(session: Session, idx: number) {
+    const summary = await computeSessionSummary(supabase, session.id)
+    const date = new Date(session.started_at).toLocaleDateString('de-DE')
+    setReviewedSession({ title: `Session ${idx + 1} · ${date}`, summary })
+  }
+
   async function deleteRound(round: Round) {
     if (!confirm('Runde löschen? Die Bilanzen werden entsprechend angepasst.')) return
     await supabase.from('round_players').delete().eq('round_id', round.id)
@@ -310,12 +319,20 @@ export default function SeasonsPage() {
                           {session.status === 'active' && ' · läuft'}
                         </span>
                       </div>
-                      <button
-                        onClick={() => deleteSession(session)}
-                        className="text-[#C8443B] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#C8443B]/10"
-                      >
-                        Löschen
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openSessionReview(session, idx)}
+                          className="text-[#2E6B3A] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#2E6B3A]/10"
+                        >
+                          Übersicht
+                        </button>
+                        <button
+                          onClick={() => deleteSession(session)}
+                          className="text-[#C8443B] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#C8443B]/10"
+                        >
+                          Löschen
+                        </button>
+                      </div>
                     </div>
                     {rounds.length === 0 ? (
                       <p className="text-[#7C7461] text-xs text-center py-3">Keine Runden</p>
@@ -379,6 +396,14 @@ export default function SeasonsPage() {
             round={editingRound}
             onClose={() => setEditingRound(null)}
             onSaved={() => { setEditingRound(null); if (detailSeason) loadSeasonDetail(detailSeason) }}
+          />
+        )}
+
+        {reviewedSession && (
+          <SessionSummaryModal
+            summary={reviewedSession.summary}
+            title={reviewedSession.title}
+            onClose={() => setReviewedSession(null)}
           />
         )}
       </div>

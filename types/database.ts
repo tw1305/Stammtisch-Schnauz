@@ -94,6 +94,12 @@ export type Badge = {
   desc: string
 }
 
+/** Per-session scoreboard, shown when a session ends and when reviewing it later. */
+export type SessionSummary = {
+  rounds: number
+  players: { player: Player; balance: number; wins: number }[]
+}
+
 export type HeadToHead = {
   opponent: Player
   games: number

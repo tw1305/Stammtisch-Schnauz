@@ -3,18 +3,18 @@
 import Portal from './Portal'
 import PlayerAvatar from './PlayerAvatar'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
-import type { Player } from '@/types/database'
+import type { SessionSummary } from '@/types/database'
 
-export type SessionSummary = {
-  rounds: number
-  players: { player: Player; balance: number; wins: number }[]
-}
+export type { SessionSummary }
 
 export default function SessionSummaryModal({
   summary,
+  title = 'Session beendet',
   onClose,
 }: {
   summary: SessionSummary
+  /** Overridden when reviewing a past session from the season overview. */
+  title?: string
   onClose: () => void
 }) {
   return (
@@ -30,7 +30,7 @@ export default function SessionSummaryModal({
           >
             <div className="text-4xl mb-1.5">🍻</div>
             <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#23201A]">
-              Session beendet
+              {title}
             </h2>
             <p className="text-[#7C7461] text-sm mt-1">
               {summary.rounds} {summary.rounds === 1 ? 'Runde' : 'Runden'} gespielt
