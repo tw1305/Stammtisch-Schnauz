@@ -78,7 +78,8 @@ export default function EinstellungenPage() {
             </button>
           </div>
           <p className="text-[#7C7461] text-xs mt-2 leading-relaxed">
-            Aktuell {defaultStake} € · Double {defaultStake * 2} € · Triple {defaultStake * 3} € · Quattro {defaultStake * 4} €
+            Einsatz-Optionen beim Rundenstart: {defaultStake} € · {defaultStake * 2} € · {defaultStake * 3} € ·{' '}
+            {defaultStake * 4} € · {defaultStake * 5} € · {defaultStake * 6} € (oder eigener Betrag)
           </p>
         </div>
 

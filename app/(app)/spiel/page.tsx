@@ -18,6 +18,8 @@ const STAKE_OPTIONS = [
   { label: 'Double', multiplier: 2 },
   { label: 'Triple', multiplier: 3 },
   { label: 'Quattro', multiplier: 4 },
+  { label: 'Quinto', multiplier: 5 },
+  { label: 'Sesto', multiplier: 6 },
 ]
 
 const DEFAULT_PLAYERS = ['Domi', 'Tom', 'André']
@@ -279,19 +281,23 @@ export default function SpielPage() {
         {activeSeason && (
           <>
             <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">
-              Wer spielt mit? ({pickedIds.size})
+              Wer spielt mit? ({pickedIds.size}/9{pickedIds.size >= 9 ? ' · Maximum erreicht' : ''})
             </p>
             <div className="grid grid-cols-3 gap-2.5 flex-1 content-start">
               {allPlayers.map(p => {
                 const picked = pickedIds.has(p.id)
+                const disabled = !picked && pickedIds.size >= 9
                 return (
                   <button
                     key={p.id}
                     onClick={() => togglePick(p.id)}
+                    disabled={disabled}
                     className={`flex flex-col items-center gap-2 rounded-2xl py-4 border transition-all ${
                       picked
                         ? 'border-[#2E6B3A] bg-[#2E6B3A]/10'
-                        : 'border-[#E4D9BF] bg-[#FBF6EA] opacity-60'
+                        : disabled
+                          ? 'border-[#E4D9BF] bg-[#FBF6EA] opacity-30'
+                          : 'border-[#E4D9BF] bg-[#FBF6EA] opacity-60'
                     }`}
                   >
                     <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={56} />
@@ -440,7 +446,7 @@ export default function SpielPage() {
       {/* Stake selection */}
       <div className="px-4 mb-4">
         <p className="text-[#7C7461] text-xs mb-2 font-medium uppercase tracking-wider">Einsatz wählen</p>
-        <div className="flex gap-2 flex-wrap">
+        <div className="grid grid-cols-4 gap-2">
           {STAKE_OPTIONS.map(opt => {
             const amount = defaultStake * opt.multiplier
             const isSelected = !showCustomInput && selectedMultiplier === opt.multiplier
@@ -448,7 +454,7 @@ export default function SpielPage() {
               <button
                 key={opt.multiplier}
                 onClick={() => { setSelectedMultiplier(opt.multiplier); setShowCustomInput(false) }}
-                className={`flex-1 min-w-[60px] rounded-xl py-3 text-sm font-semibold transition-colors border
+                className={`rounded-xl py-3 text-sm font-semibold transition-colors border
                   ${isSelected
                     ? 'bg-[#2E6B3A] border-[#2E6B3A] text-white'
                     : 'bg-[#FBF6EA] border-[#E4D9BF] text-[#23201A]'
@@ -460,7 +466,7 @@ export default function SpielPage() {
           })}
           <button
             onClick={() => setShowCustomInput(true)}
-            className={`flex-1 min-w-[44px] rounded-xl py-3 text-sm font-semibold transition-colors border
+            className={`rounded-xl py-3 text-sm font-semibold transition-colors border
               ${showCustomInput
                 ? 'bg-[#2E6B3A] border-[#2E6B3A] text-white'
                 : 'bg-[#FBF6EA] border-[#E4D9BF] text-[#7C7461]'
@@ -619,7 +625,9 @@ function PlayerManagerOverlay({
 
           {others.length > 0 && (
             <>
-              <p className="text-[#7C7461] text-[10px] uppercase tracking-wider mb-2 font-medium px-1">Weitere Spieler</p>
+              <p className="text-[#7C7461] text-[10px] uppercase tracking-wider mb-2 font-medium px-1">
+                Weitere Spieler{!canAdd ? ' · Maximum von 9 am Tisch erreicht' : ''}
+              </p>
               <div className="space-y-1.5">
                 {others.map(p => (
                   <div key={p.id} className="flex items-center gap-3 py-1.5 px-2">
