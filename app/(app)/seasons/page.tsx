@@ -333,14 +333,29 @@ export default function SeasonsPage() {
                 sessionsData.map(({ session, number, rounds, summary }) => {
                   const isOpen = openSessions.has(session.id)
                   return (
-                  <div key={session.id} className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[#FFFDF7] border-b border-[#E4D9BF]">
+                  <div
+                    key={session.id}
+                    className={`bg-[#FBF6EA] rounded-2xl border overflow-hidden transition-colors ${
+                      isOpen ? 'border-[#2E6B3A] shadow-sm' : 'border-[#E4D9BF]'
+                    }`}
+                  >
+                    <div className={`flex items-center gap-2 px-2 py-1.5 border-b border-[#E4D9BF] ${isOpen ? 'bg-[#2E6B3A]/10' : 'bg-[#FFFDF7]'}`}>
                       <button
                         onClick={() => toggleSession(session.id)}
                         aria-expanded={isOpen}
-                        className="flex-1 min-w-0 flex items-center gap-2 text-left py-1"
+                        className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
                       >
-                        <span className={`text-[#7C7461] text-xs shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
+                        {/* Large, clearly stateful toggle: outlined when closed, filled + rotated when open */}
+                        <span
+                          className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+                            isOpen ? 'bg-[#2E6B3A] border-[#2E6B3A] text-white rotate-180' : 'bg-[#FFFDF7] border-[#2E6B3A]/50 text-[#2E6B3A]'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M3.5 6l4.5 4.5L12.5 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
                         <span className="min-w-0">
                           <span className="text-[#23201A] text-sm font-semibold">Session {number}</span>
                           <span className="text-[#7C7461] text-xs ml-2">
@@ -359,8 +374,8 @@ export default function SeasonsPage() {
                     </div>
 
                     {/* Collapsed: the same scoreboard shown when a session ends */}
-                    <div className="px-2 py-1">
-                      <SessionSummaryView summary={summary} avatarSize={32} />
+                    <div className="px-1.5 py-1.5">
+                      <SessionSummaryView summary={summary} compact />
                     </div>
 
                     {isOpen && (

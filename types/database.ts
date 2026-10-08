@@ -105,6 +105,8 @@ export type PlayerStats = {
   high_stake_score: number // € summed over won rounds above the base stake (High Roller)
   base_stake_wins: number // won rounds at the base stake (Kleinvieh)
   fires: number // tracked "Feuer" (three aces) in scope
+  first_bloods: number // sessions in which this player won the first round (First Blood)
+  comebacks: number // rounds won after being eliminated and revived (Aus dem Jenseits)
 }
 
 export type Badge = {

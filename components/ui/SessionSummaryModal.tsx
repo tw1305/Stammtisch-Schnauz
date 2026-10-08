@@ -11,15 +11,38 @@ export type { SessionSummary }
  * Per-player scoreboard of one session. Shared by the end-of-session modal, the
  * session review modal and the collapsed session cards in the season overview.
  */
-export function SessionSummaryView({ summary, avatarSize = 38 }: { summary: SessionSummary; avatarSize?: number }) {
+export function SessionSummaryView({ summary, compact = false }: { summary: SessionSummary; compact?: boolean }) {
   if (summary.players.length === 0) {
-    return <p className="text-[#7C7461] text-sm text-center py-6">Keine gespielten Runden in dieser Session.</p>
+    return (
+      <p className={`text-[#7C7461] text-center ${compact ? 'text-xs py-2' : 'text-sm py-6'}`}>
+        Keine gespielten Runden in dieser Session.
+      </p>
+    )
+  }
+  if (compact) {
+    // Dense one-line-per-player list (no avatars) for the season overview cards.
+    return (
+      <div>
+        {summary.players.map(p => (
+          <div key={p.player.id} className="flex items-center gap-2 px-2 py-[3px] text-sm leading-tight">
+            <span className="text-[#23201A] font-medium truncate min-w-0">{p.player.name}</span>
+            <span className="text-[#7C7461] text-xs shrink-0 whitespace-nowrap">
+              {p.wins} {p.wins === 1 ? 'Sieg' : 'Siege'}
+              {p.fires > 0 && ` · 🔥${p.fires}`}
+            </span>
+            <span className={`ml-auto shrink-0 font-semibold tabular-nums ${getBalanceColor(p.balance)}`}>
+              {formatBalance(p.balance)}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
   }
   return (
     <div className="space-y-1.5">
       {summary.players.map(p => (
         <div key={p.player.id} className="flex items-center gap-3 px-2 py-2">
-          <PlayerAvatar name={p.player.name} avatarUrl={p.player.avatar_url} size={avatarSize} />
+          <PlayerAvatar name={p.player.name} avatarUrl={p.player.avatar_url} size={38} />
           <div className="flex-1 min-w-0">
             <p className="text-[#23201A] font-medium truncate">{p.player.name}</p>
             <p className="text-[#7C7461] text-xs">

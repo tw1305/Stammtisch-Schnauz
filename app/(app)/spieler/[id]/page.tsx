@@ -130,6 +130,10 @@ export default function PlayerDetailPage() {
               <Cell icon="🤝" label="Belebt" value={stat.revives_given} />
               <Cell icon="⚡" label="Serie" value={stat.win_streak} />
             </div>
+            <div className="grid grid-cols-2 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
+              <Cell icon="🩸" label="First Blood" value={stat.first_bloods} />
+              <Cell icon="👻" label="Aus dem Jenseits" value={stat.comebacks} />
+            </div>
           </div>
 
           {/* Balance history */}

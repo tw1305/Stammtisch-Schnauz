@@ -20,6 +20,8 @@ const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] =
   { key: 'finals', label: 'Finalteilnahmen', get: s => s.final_appearances },
   { key: 'streak', label: 'Aktuelle Serie', get: s => s.win_streak },
   { key: 'fires', label: 'Feuer', get: s => s.fires },
+  { key: 'firstblood', label: 'First Blood', get: s => s.first_bloods },
+  { key: 'comeback', label: 'Aus dem Jenseits', get: s => s.comebacks },
 ]
 
 /** Achievement icons shown inline in a collapsed row before collapsing into "+X". */
@@ -220,6 +222,10 @@ export default function StatistikenPage() {
                       <StatCell icon="💉" label="Wiederbelebt" value={s.revivals} />
                       <StatCell icon="🤝" label="Belebt" value={s.revives_given} />
                       <StatCell icon="⚡" label="Serie" value={s.win_streak} />
+                    </div>
+                    <div className="grid grid-cols-2 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
+                      <StatCell icon="🩸" label="First Blood" value={s.first_bloods} />
+                      <StatCell icon="👻" label="Aus dem Jenseits" value={s.comebacks} />
                     </div>
 
                     {/* Achievements */}

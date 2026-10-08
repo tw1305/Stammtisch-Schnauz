@@ -75,6 +75,8 @@ function emptyStats(player: Player): PlayerStats {
     high_stake_score: 0,
     base_stake_wins: 0,
     fires: 0,
+    first_bloods: 0,
+    comebacks: 0,
   }
 }
 
@@ -214,6 +216,17 @@ export async function computePlayerStats(
     if (statsMap[f.player_id]) statsMap[f.player_id].fires++
   }
 
+  // First Blood: once per session, to the winner of its first real round.
+  const firstRoundBySession: Record<string, ScopeRound> = {}
+  for (const r of rounds) {
+    if (r.round_number <= 0) continue
+    const cur = firstRoundBySession[r.session_id]
+    if (!cur || r.round_number < cur.round_number) firstRoundBySession[r.session_id] = r
+  }
+  for (const r of Object.values(firstRoundBySession)) {
+    if (r.winner_id && statsMap[r.winner_id]) statsMap[r.winner_id].first_bloods++
+  }
+
   // Aggregate counters
   for (const rp of rps) {
     const s = statsMap[rp.player_id]
@@ -228,6 +241,8 @@ export async function computePlayerStats(
     }
     if (rp.was_first_eliminated) s.first_eliminations++
     if (rp.was_revived) s.revivals++
+    // Aus dem Jenseits: knocked out, brought back, and went on to win the round.
+    if (rp.was_revived && rp.is_winner && isReal) s.comebacks++
     s.revives_given += rp.revives_given ?? 0
     if (rp.reached_final) s.final_appearances++
     if (isReal) s.rounds_played++
@@ -299,6 +314,8 @@ export const ACHIEVEMENTS: {
   { icon: '🐜', label: 'Kleinvieh', desc: `Meiste gewonnene ${BASE_STAKE}-€-Runden der Season`, min: 1, pick: s => s.base_stake_wins },
   // ☄️ instead of 🔥: the flame now stands for tracked "Feuer" (three aces).
   { icon: '☄️', label: 'Hot Streak', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
+  { icon: '🩸', label: 'First Blood', desc: 'Hat in der Season am häufigsten die erste Runde einer Session gewonnen', min: 1, pick: s => s.first_bloods },
+  { icon: '👻', label: 'Aus dem Jenseits', desc: 'Am häufigsten ausgeschieden, wiederbelebt und dann die Runde gewonnen', min: 1, pick: s => s.comebacks },
   { icon: '🐦', label: 'Phönix', desc: 'In der Season am häufigsten wiederbelebt', min: 1, pick: s => s.revivals },
   { icon: '🚑', label: 'Medic', desc: 'Hat in der Season am häufigsten andere belebt', min: 1, pick: s => s.revives_given },
   { icon: '💀', label: 'Noob', desc: 'In der Season am häufigsten zuerst raus', min: 1, pick: s => s.first_eliminations },
