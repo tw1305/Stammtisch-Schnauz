@@ -1,7 +1,60 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Player, PlayerStats, Badge, HeadToHead, Session, SessionBalancePoint, AchievementTally, SessionSummary } from '@/types/database'
+import type { Player, PlayerStats, Badge, HeadToHead, Session, Season, SessionBalancePoint, AchievementTally, SessionSummary, ScopeSummary } from '@/types/database'
 
 type Supa = SupabaseClient
+
+const PAGE = 1000 // PostgREST's default max rows per request
+const ID_CHUNK = 150 // keeps `.in()` URLs well below request-length limits
+
+/**
+ * Loads every row of `table` whose `column` is in `ids`, splitting the id list
+ * into chunks and paging through each chunk, so neither the URL length nor the
+ * 1000-row response cap silently truncates results as the history grows.
+ */
+export async function fetchByIds<T>(
+  supabase: Supa,
+  table: string,
+  select: string,
+  column: string,
+  ids: string[]
+): Promise<T[]> {
+  const out: T[] = []
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const chunk = ids.slice(i, i + ID_CHUNK)
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from(table)
+        .select(select)
+        .in(column, chunk)
+        .order('id')
+        .range(from, from + PAGE - 1)
+      if (error) throw error
+      out.push(...((data || []) as T[]))
+      if (!data || data.length < PAGE) break
+    }
+  }
+  return out
+}
+
+/** Fires for the given rounds; empty when the round_fires migration hasn't run yet. */
+export async function loadFires(supabase: Supa, roundIds: string[]) {
+  try {
+    return await fetchByIds<{ round_id: string; player_id: string; session_id: string }>(
+      supabase, 'round_fires', 'round_id, player_id, session_id', 'round_id', roundIds
+    )
+  } catch {
+    return []
+  }
+}
+
+/** Newest season first; seasons sharing a start date fall back to "Season 10" > "Season 2" name order. */
+export function compareSeasonsDesc(a: Season, b: Season): number {
+  return (
+    b.start_date.localeCompare(a.start_date) ||
+    b.name.localeCompare(a.name, 'de', { numeric: true }) ||
+    b.created_at.localeCompare(a.created_at)
+  )
+}
 
 function emptyStats(player: Player): PlayerStats {
   return {
@@ -21,6 +74,7 @@ function emptyStats(player: Player): PlayerStats {
     low_balance: 0,
     high_stake_score: 0,
     base_stake_wins: 0,
+    fires: 0,
   }
 }
 
@@ -32,27 +86,84 @@ function emptyStats(player: Player): PlayerStats {
  */
 const BASE_STAKE = 3
 
-async function roundIdsForScope(supabase: Supa, seasonId?: string | null) {
-  let query = supabase
-    .from('rounds')
-    .select('id, round_number, winner_id, started_at, stake')
-    .eq('status', 'completed')
+type ScopeRound = {
+  id: string
+  session_id: string
+  round_number: number
+  winner_id: string | null
+  started_at: string
+  stake: number
+  status: string
+}
 
+async function roundIdsForScope(supabase: Supa, seasonId?: string | null): Promise<ScopeRound[]> {
+  const select = 'id, session_id, round_number, winner_id, started_at, stake, status'
+  let rounds: ScopeRound[]
   if (seasonId && seasonId !== 'all') {
     const { data: sessions } = await supabase.from('sessions').select('id').eq('season_id', seasonId)
     const sessionIds = (sessions || []).map(s => s.id)
     if (sessionIds.length === 0) return []
-    query = query.in('session_id', sessionIds)
+    rounds = await fetchByIds<ScopeRound>(supabase, 'rounds', select, 'session_id', sessionIds)
+  } else {
+    rounds = []
+    for (let from = 0; ; from += PAGE) {
+      const { data } = await supabase.from('rounds').select(select).order('id').range(from, from + PAGE - 1)
+      rounds.push(...((data || []) as ScopeRound[]))
+      if (!data || data.length < PAGE) break
+    }
   }
+  return rounds.filter(r => r.status === 'completed')
+}
 
-  const { data } = await query
-  return (data || []) as {
-    id: string
-    round_number: number
-    winner_id: string | null
-    started_at: string
-    stake: number
-  }[]
+/**
+ * Key figures for the statistics header: real rounds played, sessions with at
+ * least one real round, average stake, revivals and fires within the scope.
+ */
+export async function computeScopeSummary(supabase: Supa, seasonId?: string | null): Promise<ScopeSummary> {
+  const real = (await roundIdsForScope(supabase, seasonId)).filter(r => r.round_number > 0)
+  if (real.length === 0) return { rounds: 0, sessions: 0, avg_stake: 0, revivals: 0, fires: 0 }
+  const ids = real.map(r => r.id)
+  const revived = (
+    await fetchByIds<{ was_revived: boolean }>(supabase, 'round_players', 'id, was_revived', 'round_id', ids)
+  ).filter(r => r.was_revived).length
+  const fires = (await loadFires(supabase, ids)).length
+  return {
+    rounds: real.length,
+    sessions: new Set(real.map(r => r.session_id)).size,
+    avg_stake: Math.round((real.reduce((a, r) => a + r.stake, 0) / real.length) * 10) / 10,
+    revivals: revived,
+    fires,
+  }
+}
+
+/** Number of consecutive wins needed to be shown "on fire". */
+export const ON_FIRE_STREAK = 3
+
+/**
+ * Players currently "on fire": they won each of their own last ON_FIRE_STREAK
+ * completed real rounds. The streak is computed over the player's rounds in
+ * chronological order regardless of session or season boundaries, so sessions
+ * (or seasons) a player skipped do not break it.
+ */
+export async function computeOnFirePlayers(supabase: Supa, playerIds: string[]): Promise<Set<string>> {
+  const result = new Set<string>()
+  if (playerIds.length === 0) return result
+  const rows = await fetchByIds<{
+    player_id: string
+    is_winner: boolean
+    round: { started_at: string; status: string; round_number: number } | null
+  }>(supabase, 'round_players', 'id, player_id, is_winner, round:rounds(started_at, status, round_number)', 'player_id', playerIds)
+
+  const byPlayer: Record<string, { at: number; won: boolean }[]> = {}
+  for (const r of rows) {
+    if (!r.round || r.round.status !== 'completed' || r.round.round_number <= 0) continue
+    ;(byPlayer[r.player_id] ??= []).push({ at: new Date(r.round.started_at).getTime(), won: r.is_winner })
+  }
+  for (const [pid, list] of Object.entries(byPlayer)) {
+    list.sort((a, b) => b.at - a.at) // newest first
+    if (list.length >= ON_FIRE_STREAK && list.slice(0, ON_FIRE_STREAK).every(x => x.won)) result.add(pid)
+  }
+  return result
 }
 
 /**
@@ -88,13 +199,23 @@ export async function computePlayerStats(
   for (const r of rounds) roundMeta[r.id] = r
   const roundIds = rounds.map(r => r.id)
 
-  const { data: rps } = await supabase
-    .from('round_players')
-    .select('*')
-    .in('round_id', roundIds)
+  const rps = await fetchByIds<{
+    round_id: string
+    player_id: string
+    is_winner: boolean
+    was_first_eliminated: boolean
+    was_revived: boolean
+    revives_given: number | null
+    reached_final: boolean
+    balance_change: number | null
+  }>(supabase, 'round_players', '*', 'round_id', roundIds)
+
+  for (const f of await loadFires(supabase, roundIds)) {
+    if (statsMap[f.player_id]) statsMap[f.player_id].fires++
+  }
 
   // Aggregate counters
-  for (const rp of rps || []) {
+  for (const rp of rps) {
     const s = statsMap[rp.player_id]
     if (!s) continue
     const meta = roundMeta[rp.round_id]
@@ -118,7 +239,7 @@ export async function computePlayerStats(
     (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
   )
   const byRoundPlayers: Record<string, Record<string, { is_winner: boolean; balance_change: number | null }>> = {}
-  for (const rp of rps || []) {
+  for (const rp of rps) {
     if (!byRoundPlayers[rp.round_id]) byRoundPlayers[rp.round_id] = {}
     byRoundPlayers[rp.round_id][rp.player_id] = {
       is_winner: rp.is_winner,
@@ -176,7 +297,8 @@ export const ACHIEVEMENTS: {
   { icon: '🏆', label: 'Seriensieger', desc: 'Meiste Rundensiege der Season', min: 1, pick: s => s.wins },
   { icon: '🎲', label: 'High Roller', desc: `Höchster €-Wert gewonnener Runden über ${BASE_STAKE} € Einsatz`, min: 1, pick: s => s.high_stake_score },
   { icon: '🐜', label: 'Kleinvieh', desc: `Meiste gewonnene ${BASE_STAKE}-€-Runden der Season`, min: 1, pick: s => s.base_stake_wins },
-  { icon: '🔥', label: 'Hot Streak', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
+  // ☄️ instead of 🔥: the flame now stands for tracked "Feuer" (three aces).
+  { icon: '☄️', label: 'Hot Streak', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
   { icon: '🐦', label: 'Phönix', desc: 'In der Season am häufigsten wiederbelebt', min: 1, pick: s => s.revivals },
   { icon: '🚑', label: 'Medic', desc: 'Hat in der Season am häufigsten andere belebt', min: 1, pick: s => s.revives_given },
   { icon: '💀', label: 'Noob', desc: 'In der Season am häufigsten zuerst raus', min: 1, pick: s => s.first_eliminations },
@@ -250,20 +372,41 @@ export async function computeSessionSummary(
   const roundIds = (rounds || []).map(r => r.id)
   if (roundIds.length === 0) return { rounds: 0, players: [] }
 
-  const { data: rps } = await supabase
-    .from('round_players')
-    .select('player_id, balance_change, is_winner, player:players(id, name, avatar_url, is_active, created_at)')
-    .in('round_id', roundIds)
+  const rps = await fetchByIds<SummaryRoundPlayer>(supabase, 'round_players', SUMMARY_RP_SELECT, 'round_id', roundIds)
+  return buildSessionSummary(roundIds.length, rps, await loadFires(supabase, roundIds))
+}
 
-  const map: Record<string, { player: Player; balance: number; wins: number }> = {}
-  for (const rp of rps || []) {
-    const p = rp.player as unknown as Player
+/** round_players columns needed by buildSessionSummary (incl. the joined player). */
+export const SUMMARY_RP_SELECT =
+  'id, round_id, player_id, balance_change, is_winner, player:players(id, name, avatar_url, is_active, created_at, birthday)'
+
+export type SummaryRoundPlayer = {
+  round_id: string
+  player_id: string
+  balance_change: number | null
+  is_winner: boolean
+  player: unknown
+}
+
+/**
+ * Pure scoreboard builder for one session from its real rounds' player rows,
+ * so callers that already loaded the data (season overview) needn't refetch.
+ */
+export function buildSessionSummary(
+  roundCount: number,
+  rps: SummaryRoundPlayer[],
+  fires: { player_id: string }[]
+): SessionSummary {
+  const map: Record<string, { player: Player; balance: number; wins: number; fires: number }> = {}
+  for (const rp of rps) {
+    const p = rp.player as Player | null
     if (!p) continue
-    if (!map[rp.player_id]) map[rp.player_id] = { player: p, balance: 0, wins: 0 }
+    if (!map[rp.player_id]) map[rp.player_id] = { player: p, balance: 0, wins: 0, fires: 0 }
     if (rp.balance_change != null) map[rp.player_id].balance += rp.balance_change
     if (rp.is_winner) map[rp.player_id].wins++
   }
-  return { rounds: roundIds.length, players: Object.values(map).sort((a, b) => b.balance - a.balance) }
+  for (const f of fires) if (map[f.player_id]) map[f.player_id].fires++
+  return { rounds: roundCount, players: Object.values(map).sort((a, b) => b.balance - a.balance) }
 }
 
 /**

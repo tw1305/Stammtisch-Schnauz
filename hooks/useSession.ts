@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Session, SessionPlayer, Round, RoundPlayer } from '@/types/database'
+import type { Session, SessionPlayer, Round, RoundPlayer, RoundFire } from '@/types/database'
 import { calculateBalances } from '@/lib/game-logic'
 
 type UndoAction =
@@ -15,6 +15,7 @@ export function useSession() {
   const [sessionPlayers, setSessionPlayers] = useState<SessionPlayer[]>([])
   const [activeRound, setActiveRound] = useState<Round | null>(null)
   const [roundPlayers, setRoundPlayers] = useState<RoundPlayer[]>([])
+  const [roundFires, setRoundFires] = useState<RoundFire[]>([])
   const [loading, setLoading] = useState(true)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
   const [startingRound, setStartingRound] = useState(false)
@@ -79,9 +80,17 @@ export function useSession() {
         .select('*, player:players(*)')
         .eq('round_id', round.id)
       setRoundPlayers(rp || [])
+      // Defensive: the round_fires table only exists after the migration.
+      const { data: fires, error: firesError } = await supabase
+        .from('round_fires')
+        .select('*')
+        .eq('round_id', round.id)
+        .order('created_at')
+      setRoundFires(firesError ? [] : fires || [])
     } else {
       setActiveRound(null)
       setRoundPlayers([])
+      setRoundFires([])
     }
 
     setLoading(false)
@@ -105,9 +114,15 @@ export function useSession() {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, trigger)
     }
     channel.subscribe()
+    // Separate channel so a missing round_fires migration can't break the main sync.
+    const firesChannel = supabase
+      .channel('schnauz-sync-fires')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'round_fires' }, trigger)
+      .subscribe()
     return () => {
       if (timer) clearTimeout(timer)
       supabase.removeChannel(channel)
+      supabase.removeChannel(firesChannel)
     }
   }, [supabase])
 
@@ -129,7 +144,27 @@ export function useSession() {
         supabase.from('session_players').update({ seat_order: i }).eq('session_id', sess.id).eq('player_id', pid)
       )
     )
-    await supabase.from('sessions').update({ dealer_player_id: playerIds[0] }).eq('id', sess.id)
+    // First round of a session: whoever lost (was first out of) the most recent
+    // round ever played deals again, if they're at the table; else the first seat.
+    let firstDealer = playerIds[0]
+    const { data: lastRound } = await supabase
+      .from('rounds')
+      .select('id, winner_id')
+      .eq('status', 'completed')
+      .gt('round_number', 0)
+      .neq('session_id', sess.id)
+      .order('started_at', { ascending: false })
+      .limit(1)
+    if (lastRound && lastRound.length > 0) {
+      const { data: loser } = await supabase
+        .from('round_players')
+        .select('player_id')
+        .eq('round_id', lastRound[0].id)
+        .eq('was_first_eliminated', true)
+      const candidate = (loser || []).map(l => l.player_id).find(id => id !== lastRound[0].winner_id)
+      if (candidate && playerIds.includes(candidate)) firstDealer = candidate
+    }
+    await supabase.from('sessions').update({ dealer_player_id: firstDealer }).eq('id', sess.id)
 
     await loadActiveSession()
   }
@@ -307,6 +342,24 @@ export function useSession() {
     await reloadRoundPlayers(activeRound.id)
   }
 
+  /** Records a "Feuer" (three aces) for a player in the active round. Returns false if storing failed. */
+  async function addFire(playerId: string): Promise<boolean> {
+    if (!activeRound || !session) return false
+    const { data, error } = await supabase
+      .from('round_fires')
+      .insert({ round_id: activeRound.id, session_id: session.id, player_id: playerId })
+      .select()
+      .single()
+    if (error || !data) return false
+    setRoundFires(f => [...f, data as RoundFire])
+    return true
+  }
+
+  async function removeFire(fireId: string) {
+    await supabase.from('round_fires').delete().eq('id', fireId)
+    setRoundFires(f => f.filter(x => x.id !== fireId))
+  }
+
   async function undoLast() {
     if (!activeRound || undoStack.length === 0) return
     const action = undoStack[undoStack.length - 1]
@@ -428,6 +481,9 @@ export function useSession() {
     sessionPlayers,
     activeRound,
     roundPlayers,
+    roundFires,
+    addFire,
+    removeFire,
     loading,
     completedRound,
     canUndo: undoStack.length > 0,

@@ -10,9 +10,9 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import { computeSessionSummary } from '@/lib/stats'
+import { computeSessionSummary, computeOnFirePlayers } from '@/lib/stats'
 import { feedbackEliminate, feedbackRevive, feedbackWinner } from '@/lib/feedback'
-import type { Season, Player, RoundPlayer, SessionPlayer } from '@/types/database'
+import type { Season, Player, RoundPlayer, RoundFire, SessionPlayer } from '@/types/database'
 
 const STAKE_OPTIONS = [
   { label: 'Standard', multiplier: 1 },
@@ -34,6 +34,9 @@ export default function SpielPage() {
     sessionPlayers,
     activeRound,
     roundPlayers,
+    roundFires,
+    addFire,
+    removeFire,
     loading,
     completedRound,
     startSession,
@@ -65,10 +68,25 @@ export default function SpielPage() {
   const [pickedIds, setPickedIds] = useState<Set<string>>(new Set())
   const [reviveTarget, setReviveTarget] = useState<string | null>(null)
   const [endData, setEndData] = useState<{ session: SessionSummary; season: SeasonSummary | null } | null>(null)
+  const [showFirePicker, setShowFirePicker] = useState(false)
+  const [onFireIds, setOnFireIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadMeta()
   }, [])
+
+  // "On fire" = won own last 3 rounds (across sessions/seasons). Recompute whenever
+  // the table changes or a round starts/ends.
+  const tableKey = sessionPlayers.map(sp => sp.player_id).join(',')
+  useEffect(() => {
+    let cancelled = false
+    const ids = tableKey ? tableKey.split(',') : []
+    computeOnFirePlayers(supabase, ids)
+      .then(set => { if (!cancelled) setOnFireIds(set) })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableKey, activeRound?.id, completedRound?.round.id])
 
   useEffect(() => {
     if (activeSeason) loadSeasonBalances()
@@ -328,6 +346,13 @@ export default function SpielPage() {
           </div>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => setShowFirePicker(true)}
+              aria-label="Feuer erfassen"
+              className="h-9 px-3 flex items-center gap-1 rounded-full text-sm font-semibold transition-colors bg-[#B85C1E]/10 border border-[#B85C1E]/40 text-[#9A4A15]"
+            >
+              🔥{roundFires.length > 0 && <span className="tabular-nums">{roundFires.length}</span>}
+            </button>
+            <button
               onClick={undoLast}
               disabled={!canUndo}
               className="h-9 px-3 flex items-center gap-1 rounded-full text-sm font-medium transition-colors disabled:opacity-35 bg-[#FBF6EA] border border-[#E4D9BF] text-[#23201A]"
@@ -351,12 +376,32 @@ export default function SpielPage() {
             onPlayerTap={handlePlayerTap}
             isRoundActive={true}
             dealerId={dealerId}
+            onFireIds={onFireIds}
           />
         </div>
 
         <div className="px-4 pb-4 text-center text-[#7C7461] text-sm">
           💡 Spieler antippen zum Ausscheiden / Wiederbeleben
         </div>
+
+        {showFirePicker && (
+          <FireModal
+            candidates={roundPlayers.filter(r => r.is_active)}
+            fires={roundFires}
+            nameOf={id => roundPlayers.find(r => r.player_id === id)?.player?.name ?? '?'}
+            onAdd={async playerId => {
+              const ok = await addFire(playerId)
+              if (ok) {
+                feedbackRevive()
+                setShowFirePicker(false)
+              } else {
+                alert('Feuer konnte nicht gespeichert werden. Wurde die Datenbank-Migration (round_fires) schon ausgeführt?')
+              }
+            }}
+            onRemove={removeFire}
+            onClose={() => setShowFirePicker(false)}
+          />
+        )}
 
         {reviveTarget && (
           <ReviveModal
@@ -400,6 +445,7 @@ export default function SpielPage() {
           sessionBalances={sessionBalances}
           isRoundActive={false}
           dealerId={dealerId}
+          onFireIds={onFireIds}
         />
       </div>
 
@@ -477,9 +523,9 @@ export default function SpielPage() {
         </button>
         <button
           onClick={handleEndSession}
-          className="w-full bg-[#FBF6EA] border border-[#E4D9BF] hover:bg-[#FFFDF7] text-[#7C7461] font-medium rounded-2xl py-3 text-sm transition-colors"
+          className="w-full bg-[#B85C1E] hover:bg-[#A04F18] text-white font-semibold rounded-2xl py-3 text-sm transition-colors"
         >
-          Session beenden
+          🏁 Session beenden
         </button>
       </div>
 
@@ -564,25 +610,26 @@ function PlayerManagerOverlay({
               const isDealer = sp.player_id === dealerId
               return (
                 <div key={sp.id} className="flex items-center gap-2 py-1.5 px-2 bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl">
-                  <div className="flex flex-col">
+                  {/* Big touch targets (44×44) for reordering seats */}
+                  <div className="flex gap-1 shrink-0">
                     <button
                       onClick={() => i > 0 && onMove(sp.id, -1)}
                       disabled={i === 0}
-                      className="text-[#7C7461] text-xs leading-none disabled:opacity-30 px-1"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg bg-[#E4D9BF]/60 text-[#23201A] text-lg leading-none active:bg-[#D8C9A6] disabled:opacity-25 transition-colors"
                       aria-label="nach oben"
                     >▲</button>
                     <button
                       onClick={() => i < sessionPlayers.length - 1 && onMove(sp.id, 1)}
                       disabled={i === sessionPlayers.length - 1}
-                      className="text-[#7C7461] text-xs leading-none disabled:opacity-30 px-1"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg bg-[#E4D9BF]/60 text-[#23201A] text-lg leading-none active:bg-[#D8C9A6] disabled:opacity-25 transition-colors"
                       aria-label="nach unten"
                     >▼</button>
                   </div>
                   <PlayerAvatar name={sp.player?.name ?? ''} avatarUrl={sp.player?.avatar_url} size={34} />
-                  <span className="text-[#23201A] flex-1 text-sm truncate">{sp.player?.name}</span>
+                  <span className="text-[#23201A] flex-1 min-w-0 text-sm truncate">{sp.player?.name}</span>
                   <button
                     onClick={() => onSetDealer(sp.player_id)}
-                    className={`text-xs font-medium px-2.5 py-1.5 rounded-lg ${
+                    className={`shrink-0 h-11 text-xs font-medium px-2.5 rounded-lg ${
                       isDealer ? 'bg-[#2E6B3A] text-white' : 'bg-[#E4D9BF]/60 text-[#7C7461]'
                     }`}
                   >
@@ -590,9 +637,11 @@ function PlayerManagerOverlay({
                   </button>
                   <button
                     onClick={() => onRemove(sp.id)}
-                    className="text-[#C8443B] text-xs font-medium px-2.5 py-1.5 rounded-lg bg-[#C8443B]/10"
+                    aria-label={`${sp.player?.name ?? 'Spieler'} entfernen`}
+                    title="Entfernen"
+                    className="w-11 h-11 shrink-0 flex items-center justify-center text-[#C8443B] text-base font-bold rounded-lg bg-[#C8443B]/10"
                   >
-                    Entfernen
+                    ✕
                   </button>
                 </div>
               )
@@ -630,6 +679,89 @@ function PlayerManagerOverlay({
         </div>
       </div>
     </div>
+    </Portal>
+  )
+}
+
+function FireModal({
+  candidates,
+  fires,
+  nameOf,
+  onAdd,
+  onRemove,
+  onClose,
+}: {
+  candidates: RoundPlayer[]
+  fires: RoundFire[]
+  nameOf: (playerId: string) => string
+  onAdd: (playerId: string) => Promise<void>
+  onRemove: (fireId: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  async function run(fn: () => Promise<void>) {
+    if (busy) return
+    setBusy(true)
+    try { await fn() } finally { setBusy(false) }
+  }
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-end animate-fade-in" onClick={onClose}>
+        <div
+          className="w-full max-w-md mx-auto bg-[#FBF6EA] rounded-t-3xl border-t border-[#E4D9BF] max-h-[80vh] flex flex-col animate-pop-in"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 border-b border-[#E4D9BF]">
+            <h2 className="font-[family-name:var(--font-display)] font-bold text-[#23201A]">🔥 Feuer!</h2>
+            <p className="text-[#7C7461] text-sm mt-0.5">Wer hatte drei Asse?</p>
+          </div>
+          <div className="overflow-y-auto flex-1 px-4 py-3">
+            <div className="space-y-1.5">
+              {candidates.map(c => (
+                <button
+                  key={c.player_id}
+                  onClick={() => run(() => onAdd(c.player_id))}
+                  disabled={busy}
+                  className="w-full flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-[#FFFDF7] transition-colors disabled:opacity-50"
+                >
+                  <PlayerAvatar name={c.player?.name ?? ''} avatarUrl={c.player?.avatar_url} size={36} />
+                  <span className="text-[#23201A] flex-1 text-left">{c.player?.name}</span>
+                  <span className="text-[#9A4A15] text-sm font-medium">🔥 erfassen</span>
+                </button>
+              ))}
+            </div>
+
+            {fires.length > 0 && (
+              <>
+                <p className="text-[#7C7461] text-[10px] uppercase tracking-wider mt-4 mb-1.5 font-medium px-1">
+                  In dieser Runde erfasst
+                </p>
+                <div className="space-y-1.5">
+                  {fires.map(f => (
+                    <div key={f.id} className="flex items-center gap-3 py-1.5 px-3 bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl">
+                      <span className="text-base">🔥</span>
+                      <span className="text-[#23201A] flex-1 text-sm truncate">{nameOf(f.player_id)}</span>
+                      <button
+                        onClick={() => run(() => onRemove(f.id))}
+                        disabled={busy}
+                        className="text-[#C8443B] text-xs font-medium px-3 h-9 rounded-lg bg-[#C8443B]/10 disabled:opacity-50"
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-[#E4D9BF]">
+            <button onClick={onClose} className="w-full bg-[#FFFDF7] border border-[#E4D9BF] text-[#7C7461] font-medium rounded-2xl py-3">
+              Schließen
+            </button>
+          </div>
+        </div>
+      </div>
     </Portal>
   )
 }

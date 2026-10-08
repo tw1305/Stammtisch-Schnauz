@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
-import { computePlayerStats, deriveBadges, computeSeasonAchievements } from '@/lib/stats'
+import { computePlayerStats, deriveBadges, computeSeasonAchievements, computeScopeSummary, compareSeasonsDesc } from '@/lib/stats'
 import BalanceSparkline from '@/components/ui/BalanceSparkline'
 import AchievementsInfoModal from '@/components/ui/AchievementsInfoModal'
-import type { Season, PlayerStats, Badge, AchievementTally } from '@/types/database'
+import type { Season, PlayerStats, Badge, AchievementTally, ScopeSummary } from '@/types/database'
 
 const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] = [
   { key: 'balance', label: 'Gesamtbilanz', get: s => s.total_balance },
@@ -19,8 +19,11 @@ const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] =
   { key: 'given', label: 'Andere belebt', get: s => s.revives_given },
   { key: 'finals', label: 'Finalteilnahmen', get: s => s.final_appearances },
   { key: 'streak', label: 'Aktuelle Serie', get: s => s.win_streak },
-  { key: 'record', label: 'Rekord-Serie', get: s => s.longest_streak },
+  { key: 'fires', label: 'Feuer', get: s => s.fires },
 ]
+
+/** Achievement icons shown inline in a collapsed row before collapsing into "+X". */
+const MAX_INLINE_BADGES = 4
 
 function rankColor(i: number): string {
   if (i === 0) return '#D4AF37'
@@ -39,6 +42,7 @@ export default function StatistikenPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [tally, setTally] = useState<Record<string, AchievementTally[]>>({})
   const [showInfo, setShowInfo] = useState(false)
+  const [scope, setScope] = useState<ScopeSummary | null>(null)
 
   function toggle(id: string) {
     setExpanded(prev => {
@@ -50,15 +54,14 @@ export default function StatistikenPage() {
   }
 
   useEffect(() => { loadSeasons(); loadTally() }, [])
+  const seasonRef = useRef(selectedSeasonId)
+  seasonRef.current = selectedSeasonId
   useEffect(() => { loadStats() }, [selectedSeasonId])
 
   async function loadSeasons() {
     // Oldest → newest, so the dropdown reads "Alle Seasons" then chronological.
-    const { data } = await supabase
-      .from('seasons')
-      .select('*')
-      .order('start_date', { ascending: true })
-    setSeasons(data || [])
+    const { data } = await supabase.from('seasons').select('*')
+    setSeasons((data || []).sort(compareSeasonsDesc).reverse())
     // Default to the currently active season when there is one.
     const active = (data || []).find(s => s.status === 'active')
     if (active) setSelectedSeasonId(active.id)
@@ -70,8 +73,15 @@ export default function StatistikenPage() {
 
   async function loadStats() {
     setLoading(true)
-    const result = await computePlayerStats(supabase, { seasonId: selectedSeasonId })
+    const seasonId = selectedSeasonId
+    const [result, summary] = await Promise.all([
+      computePlayerStats(supabase, { seasonId }),
+      computeScopeSummary(supabase, seasonId),
+    ])
+    // Ignore a stale response if the selection changed while loading.
+    if (seasonRef.current !== seasonId) return
     setStats(result)
+    setScope(summary)
     setLoading(false)
   }
 
@@ -118,6 +128,17 @@ export default function StatistikenPage() {
             ))}
           </select>
         </div>
+
+        {/* Key figures for the selected scope */}
+        {scope && (
+          <div className="mt-3 grid grid-cols-5 bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl divide-x divide-[#E4D9BF]">
+            <KeyFigure label="Runden" value={scope.rounds} />
+            <KeyFigure label="Sessions" value={scope.sessions} />
+            <KeyFigure label="Ø Einsatz" value={`${scope.avg_stake.toLocaleString('de-DE')} €`} />
+            <KeyFigure label="Wiederbelebt" value={scope.revivals} icon="💉" />
+            <KeyFigure label="Feuer" value={scope.fires} icon="🔥" />
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -151,22 +172,31 @@ export default function StatistikenPage() {
                   >
                     {i + 1}
                   </div>
-                  <span className="min-w-0 font-semibold text-[15px] text-[#23201A] truncate">{s.player.name}</span>
-                  {isAll
-                    ? playerAch.length > 0 && (
-                        <span className="flex items-center gap-1 shrink-0 leading-none">
-                          {playerAch.map(a => (
-                            <span key={a.label} className="inline-flex items-center gap-px">
-                              <span className="text-xs">{a.icon}</span>
-                              <span className="text-[10px] font-semibold text-[#7C7461]">{a.count}</span>
-                            </span>
-                          ))}
-                        </span>
-                      )
-                    : playerBadges.length > 0 && (
-                        <span className="text-xs leading-none shrink-0">{playerBadges.map(b => b.icon).join('')}</span>
-                      )}
-                  <span className={`ml-auto font-bold text-base tabular-nums ${getBalanceColor(s.total_balance)}`}>
+                  {/* Name always gets its own line; achievements sit below it and
+                      collapse into "+X" so they can never push the name out. */}
+                  <span className="flex-1 min-w-0 flex flex-col">
+                    <span className="font-semibold text-[15px] text-[#23201A] truncate leading-tight">{s.player.name}</span>
+                    {(isAll ? playerAch.length : playerBadges.length) > 0 && (
+                      <span className="flex items-center gap-1 leading-none mt-0.5 min-w-0 overflow-hidden whitespace-nowrap">
+                        {isAll
+                          ? playerAch.slice(0, MAX_INLINE_BADGES).map(a => (
+                              <span key={a.label} className="inline-flex items-center gap-px" title={a.label}>
+                                <span className="text-xs">{a.icon}</span>
+                                <span className="text-[10px] font-semibold text-[#7C7461]">{a.count}</span>
+                              </span>
+                            ))
+                          : playerBadges.slice(0, MAX_INLINE_BADGES).map(b => (
+                              <span key={b.label} className="text-xs" title={b.label}>{b.icon}</span>
+                            ))}
+                        {(isAll ? playerAch.length : playerBadges.length) > MAX_INLINE_BADGES && (
+                          <span className="text-[10px] font-semibold text-[#7C7461]">
+                            +{(isAll ? playerAch.length : playerBadges.length) - MAX_INLINE_BADGES}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                  <span className={`shrink-0 font-bold text-base tabular-nums ${getBalanceColor(s.total_balance)}`}>
                     {formatBalance(s.total_balance)}
                   </span>
                   <span className={`text-[#7C7461] text-xs shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
@@ -184,7 +214,7 @@ export default function StatistikenPage() {
                     <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="💀" label="1. Aus" value={s.first_eliminations} />
                       <StatCell icon="⚔️" label="Finals" value={s.final_appearances} />
-                      <StatCell icon="🔥" label="Rekord" value={s.longest_streak} highlight={s.longest_streak >= 3} />
+                      <StatCell icon="🔥" label="Feuer" value={s.fires} />
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="💉" label="Wiederbelebt" value={s.revivals} />
@@ -236,6 +266,18 @@ function BadgeChip({ badge, count }: { badge: Badge; count?: number }) {
       <span className="font-medium">{badge.label}</span>
       {count != null && <span className="font-bold text-[#2E6B3A]">×{count}</span>}
     </span>
+  )
+}
+
+function KeyFigure({ label, value, icon }: { label: string; value: number | string; icon?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-2 px-0.5 min-w-0">
+      <span className="text-[15px] font-bold text-[#23201A] tabular-nums leading-tight whitespace-nowrap">
+        {icon && <span className="text-xs mr-0.5">{icon}</span>}
+        {value}
+      </span>
+      <span className="text-[10px] text-[#7C7461] leading-tight truncate max-w-full">{label}</span>
+    </div>
   )
 }
 

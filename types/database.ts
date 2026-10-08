@@ -62,6 +62,24 @@ export type RoundPlayer = {
   player?: Player
 }
 
+/** A "Feuer" (three aces) a player had during a round. */
+export type RoundFire = {
+  id: string
+  round_id: string
+  session_id: string
+  player_id: string
+  created_at: string
+}
+
+/** Aggregate key figures for the selected statistics scope (one season or all). */
+export type ScopeSummary = {
+  rounds: number
+  sessions: number
+  avg_stake: number
+  revivals: number
+  fires: number
+}
+
 export type AppSettings = {
   id: string
   user_id: string
@@ -86,6 +104,7 @@ export type PlayerStats = {
   low_balance: number // worst cumulative balance ever reached in scope (Kotstern)
   high_stake_score: number // € summed over won rounds above the base stake (High Roller)
   base_stake_wins: number // won rounds at the base stake (Kleinvieh)
+  fires: number // tracked "Feuer" (three aces) in scope
 }
 
 export type Badge = {
@@ -97,7 +116,7 @@ export type Badge = {
 /** Per-session scoreboard, shown when a session ends and when reviewing it later. */
 export type SessionSummary = {
   rounds: number
-  players: { player: Player; balance: number; wins: number }[]
+  players: { player: Player; balance: number; wins: number; fires: number }[]
 }
 
 export type HeadToHead = {

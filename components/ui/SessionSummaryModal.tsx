@@ -7,6 +7,33 @@ import type { SessionSummary } from '@/types/database'
 
 export type { SessionSummary }
 
+/**
+ * Per-player scoreboard of one session. Shared by the end-of-session modal, the
+ * session review modal and the collapsed session cards in the season overview.
+ */
+export function SessionSummaryView({ summary, avatarSize = 38 }: { summary: SessionSummary; avatarSize?: number }) {
+  if (summary.players.length === 0) {
+    return <p className="text-[#7C7461] text-sm text-center py-6">Keine gespielten Runden in dieser Session.</p>
+  }
+  return (
+    <div className="space-y-1.5">
+      {summary.players.map(p => (
+        <div key={p.player.id} className="flex items-center gap-3 px-2 py-2">
+          <PlayerAvatar name={p.player.name} avatarUrl={p.player.avatar_url} size={avatarSize} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[#23201A] font-medium truncate">{p.player.name}</p>
+            <p className="text-[#7C7461] text-xs">
+              {p.wins} {p.wins === 1 ? 'Sieg' : 'Siege'}
+              {p.fires > 0 && ` · 🔥 ${p.fires}`}
+            </p>
+          </div>
+          <span className={`font-bold ${getBalanceColor(p.balance)}`}>{formatBalance(p.balance)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function SessionSummaryModal({
   summary,
   title = 'Session beendet',
@@ -38,22 +65,7 @@ export default function SessionSummaryModal({
           </div>
 
           <div className="overflow-y-auto flex-1 px-4 py-3">
-            {summary.players.length === 0 ? (
-              <p className="text-[#7C7461] text-sm text-center py-6">Keine gespielten Runden in dieser Session.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {summary.players.map(p => (
-                  <div key={p.player.id} className="flex items-center gap-3 px-2 py-2">
-                    <PlayerAvatar name={p.player.name} avatarUrl={p.player.avatar_url} size={38} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[#23201A] font-medium truncate">{p.player.name}</p>
-                      <p className="text-[#7C7461] text-xs">{p.wins} {p.wins === 1 ? 'Sieg' : 'Siege'}</p>
-                    </div>
-                    <span className={`font-bold ${getBalanceColor(p.balance)}`}>{formatBalance(p.balance)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <SessionSummaryView summary={summary} />
           </div>
 
           <div className="px-5 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] border-t border-[#E4D9BF]">

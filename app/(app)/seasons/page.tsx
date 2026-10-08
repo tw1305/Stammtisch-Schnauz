@@ -10,12 +10,20 @@ import {
   getBalanceColor,
 } from '@/lib/game-logic'
 import type { Season, Player, DebtSettlement, Session, Round, RoundPlayer, SessionSummary } from '@/types/database'
-import { computeSessionSummary } from '@/lib/stats'
+import {
+  compareSeasonsDesc,
+  fetchByIds,
+  loadFires,
+  buildSessionSummary,
+  SUMMARY_RP_SELECT,
+  type SummaryRoundPlayer,
+} from '@/lib/stats'
 import Portal from '@/components/ui/Portal'
-import SessionSummaryModal from '@/components/ui/SessionSummaryModal'
+import { SessionSummaryView } from '@/components/ui/SessionSummaryModal'
 
 type SeasonWithStats = Season & { roundCount: number; avgStake: number }
-type SessionWithRounds = { session: Session; rounds: Round[] }
+/** `number` is the chronological session number within the season (1 = oldest). */
+type SessionWithRounds = { session: Session; number: number; rounds: Round[]; summary: SessionSummary }
 
 export default function SeasonsPage() {
   const supabase = createClient()
@@ -31,7 +39,16 @@ export default function SeasonsPage() {
   const [editingRound, setEditingRound] = useState<Round | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
-  const [reviewedSession, setReviewedSession] = useState<{ title: string; summary: SessionSummary } | null>(null)
+  const [openSessions, setOpenSessions] = useState<Set<string>>(new Set())
+
+  function toggleSession(id: string) {
+    setOpenSessions(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => { loadSeasons() }, [])
 
@@ -53,10 +70,9 @@ export default function SeasonsPage() {
     const { data } = await supabase
       .from('seasons')
       .select('*')
-      .order('start_date', { ascending: false })
 
     const enriched: SeasonWithStats[] = []
-    for (const s of data || []) {
+    for (const s of (data || []).sort(compareSeasonsDesc)) {
       const { data: sessions } = await supabase.from('sessions').select('id').eq('season_id', s.id)
       const sessionIds = sessions?.map(x => x.id) || []
       let roundCount = 0
@@ -146,26 +162,37 @@ export default function SeasonsPage() {
       .order('round_number', { ascending: true })
 
     const allRounds = rounds || []
+    const completedRoundIds = allRounds.filter(r => r.status === 'completed').map(r => r.id)
+    const rps = await fetchByIds<SummaryRoundPlayer>(supabase, 'round_players', SUMMARY_RP_SELECT, 'round_id', completedRoundIds)
+    const fires = await loadFires(supabase, completedRoundIds)
+
+    // Session cards: newest first, but keep the chronological "Session N" numbering.
     setSessionsData(
-      sessionList.map(s => ({
-        session: s,
-        rounds: allRounds.filter(r => r.session_id === s.id),
-      }))
+      sessionList
+        .map((s, i) => {
+          const sRounds = allRounds.filter(r => r.session_id === s.id)
+          const realIds = new Set(sRounds.filter(r => r.status === 'completed' && r.round_number > 0).map(r => r.id))
+          return {
+            session: s,
+            number: i + 1,
+            rounds: sRounds,
+            summary: buildSessionSummary(
+              realIds.size,
+              rps.filter(rp => realIds.has(rp.round_id)),
+              fires.filter(f => realIds.has(f.round_id))
+            ),
+          }
+        })
+        .reverse()
     )
 
-    const completedRoundIds = allRounds.filter(r => r.status === 'completed').map(r => r.id)
     if (completedRoundIds.length === 0) {
       setSeasonBalances([]); setSettlements([])
       return
     }
 
-    const { data: rps } = await supabase
-      .from('round_players')
-      .select('player_id, balance_change, player:players(id, name, avatar_url, is_active, created_at)')
-      .in('round_id', completedRoundIds)
-
     const balMap: Record<string, { player: Player; total: number }> = {}
-    for (const rp of rps || []) {
+    for (const rp of rps) {
       const p = rp.player as unknown as Player
       if (!p) continue
       if (!balMap[rp.player_id]) balMap[rp.player_id] = { player: p, total: 0 }
@@ -174,12 +201,6 @@ export default function SeasonsPage() {
     const bals = Object.values(balMap).sort((a, b) => b.total - a.total)
     setSeasonBalances(bals)
     setSettlements(calculateSettlements(bals))
-  }
-
-  async function openSessionReview(session: Session, idx: number) {
-    const summary = await computeSessionSummary(supabase, session.id)
-    const date = new Date(session.started_at).toLocaleDateString('de-DE')
-    setReviewedSession({ title: `Session ${idx + 1} · ${date}`, summary })
   }
 
   async function deleteRound(round: Round) {
@@ -309,31 +330,42 @@ export default function SeasonsPage() {
               {sessionsData.length === 0 ? (
                 <p className="text-[#7C7461] text-sm text-center py-4">Keine Sessions</p>
               ) : (
-                sessionsData.map(({ session, rounds }, idx) => (
+                sessionsData.map(({ session, number, rounds, summary }) => {
+                  const isOpen = openSessions.has(session.id)
+                  return (
                   <div key={session.id} className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#FFFDF7] border-b border-[#E4D9BF]">
-                      <div>
-                        <span className="text-[#23201A] text-sm font-semibold">Session {idx + 1}</span>
-                        <span className="text-[#7C7461] text-xs ml-2">
-                          {new Date(session.started_at).toLocaleDateString('de-DE')}
-                          {session.status === 'active' && ' · läuft'}
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#FFFDF7] border-b border-[#E4D9BF]">
+                      <button
+                        onClick={() => toggleSession(session.id)}
+                        aria-expanded={isOpen}
+                        className="flex-1 min-w-0 flex items-center gap-2 text-left py-1"
+                      >
+                        <span className={`text-[#7C7461] text-xs shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
+                        <span className="min-w-0">
+                          <span className="text-[#23201A] text-sm font-semibold">Session {number}</span>
+                          <span className="text-[#7C7461] text-xs ml-2">
+                            {new Date(session.started_at).toLocaleDateString('de-DE')}
+                            {' · '}{summary.rounds} {summary.rounds === 1 ? 'Runde' : 'Runden'}
+                            {session.status === 'active' && ' · läuft'}
+                          </span>
                         </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => openSessionReview(session, idx)}
-                          className="text-[#2E6B3A] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#2E6B3A]/10"
-                        >
-                          Übersicht
-                        </button>
-                        <button
-                          onClick={() => deleteSession(session)}
-                          className="text-[#C8443B] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#C8443B]/10"
-                        >
-                          Löschen
-                        </button>
-                      </div>
+                      </button>
+                      <button
+                        onClick={() => deleteSession(session)}
+                        className="text-[#C8443B] text-xs font-medium px-2.5 py-1 rounded-lg bg-[#C8443B]/10 shrink-0"
+                      >
+                        Löschen
+                      </button>
                     </div>
+
+                    {/* Collapsed: the same scoreboard shown when a session ends */}
+                    <div className="px-2 py-1">
+                      <SessionSummaryView summary={summary} avatarSize={32} />
+                    </div>
+
+                    {isOpen && (
+                    <div className="border-t border-[#E4D9BF] animate-fade-in">
+                    <p className="text-[#7C7461] text-[10px] uppercase tracking-wider font-medium px-4 pt-2.5 pb-1">Runden</p>
                     {rounds.length === 0 ? (
                       <p className="text-[#7C7461] text-xs text-center py-3">Keine Runden</p>
                     ) : (
@@ -364,8 +396,11 @@ export default function SeasonsPage() {
                         </div>
                       ))
                     )}
+                    </div>
+                    )}
                   </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -396,14 +431,6 @@ export default function SeasonsPage() {
             round={editingRound}
             onClose={() => setEditingRound(null)}
             onSaved={() => { setEditingRound(null); if (detailSeason) loadSeasonDetail(detailSeason) }}
-          />
-        )}
-
-        {reviewedSession && (
-          <SessionSummaryModal
-            summary={reviewedSession.summary}
-            title={reviewedSession.title}
-            onClose={() => setReviewedSession(null)}
           />
         )}
       </div>
@@ -458,7 +485,7 @@ export default function SeasonsPage() {
           seasons.map(s => (
             <button
               key={s.id}
-              onClick={() => loadSeasonDetail(s)}
+              onClick={() => { setOpenSessions(new Set()); loadSeasonDetail(s) }}
               className="w-full text-left bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] p-4 hover:border-[#2E6B3A]/50 transition-colors"
             >
               <div className="flex items-center justify-between mb-1.5">

@@ -123,7 +123,7 @@ export default function PlayerDetailPage() {
             <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
               <Cell icon="💀" label="1. Aus" value={stat.first_eliminations} />
               <Cell icon="⚔️" label="Finals" value={stat.final_appearances} />
-              <Cell icon="🔥" label="Rekord" value={stat.longest_streak} />
+              <Cell icon="🔥" label="Feuer" value={stat.fires} />
             </div>
             <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
               <Cell icon="💉" label="Wiederbelebt" value={stat.revivals} />

@@ -86,7 +86,7 @@ export default function RoundResultModal({
           </button>
           <button
             onClick={onEndSession}
-            className="w-full bg-[#FFFDF7] border border-[#E4D9BF] hover:bg-[#E4D9BF] text-[#7C7461] font-medium rounded-xl py-3 transition-colors"
+            className="w-full bg-[#B85C1E]/10 border border-[#B85C1E]/50 hover:bg-[#B85C1E]/20 text-[#9A4A15] font-semibold rounded-xl py-3 transition-colors"
           >
             🏁 Session beenden
           </button>

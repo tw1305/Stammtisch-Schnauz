@@ -5,7 +5,7 @@ import Portal from './Portal'
 import PlayerAvatar from './PlayerAvatar'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import type { Player } from '@/types/database'
-import type { SessionSummary } from './SessionSummaryModal'
+import { SessionSummaryView, type SessionSummary } from './SessionSummaryModal'
 
 export type SeasonSummary = {
   name: string
@@ -100,22 +100,7 @@ function SessionView({ summary }: { summary: SessionSummary }) {
       <p className="text-center text-[#7C7461] text-sm mb-3">
         {summary.rounds} {summary.rounds === 1 ? 'Runde' : 'Runden'} in dieser Session
       </p>
-      {summary.players.length === 0 ? (
-        <p className="text-[#7C7461] text-sm text-center py-6">Keine gespielten Runden in dieser Session.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {summary.players.map(p => (
-            <div key={p.player.id} className="flex items-center gap-3 px-2 py-2">
-              <PlayerAvatar name={p.player.name} avatarUrl={p.player.avatar_url} size={38} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[#23201A] font-medium truncate">{p.player.name}</p>
-                <p className="text-[#7C7461] text-xs">{p.wins} {p.wins === 1 ? 'Sieg' : 'Siege'}</p>
-              </div>
-              <span className={`font-bold ${getBalanceColor(p.balance)}`}>{formatBalance(p.balance)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <SessionSummaryView summary={summary} />
     </>
   )
 }

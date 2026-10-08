@@ -11,6 +11,7 @@ type GameTableProps = {
   onPlayerTap?: (playerId: string) => void
   isRoundActive?: boolean
   dealerId?: string | null
+  onFireIds?: Set<string>
 }
 
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
@@ -76,6 +77,7 @@ export default function GameTable({
   onPlayerTap,
   isRoundActive = false,
   dealerId = null,
+  onFireIds,
 }: GameTableProps) {
   const count = sessionPlayers.length
   const base = sizingFor(count)
@@ -173,6 +175,7 @@ export default function GameTable({
                 eliminated={isEliminated}
                 isWinner={isWinner}
                 birthday={player.birthday}
+                onFire={onFireIds?.has(sp.player_id)}
               />
               {dealerId === sp.player_id && (
                 <span

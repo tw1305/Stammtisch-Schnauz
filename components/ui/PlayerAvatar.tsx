@@ -1,6 +1,7 @@
 import { getPlayerInitials } from '@/lib/game-logic'
 import { isBirthdayWeek } from '@/lib/birthday'
 import LaurelWreath from './LaurelWreath'
+import FireRing from './FireRing'
 
 const GRADIENTS: [string, string][] = [
   ['#6366F1', '#8B5CF6'],
@@ -27,17 +28,28 @@ type Props = {
   eliminated?: boolean
   isWinner?: boolean
   birthday?: string | null
+  /** Won the last three rounds in a row → ring of flames */
+  onFire?: boolean
 }
 
-export default function PlayerAvatar({ name, avatarUrl, size = 48, eliminated, isWinner, birthday }: Props) {
+export default function PlayerAvatar({ name, avatarUrl, size = 48, eliminated, isWinner, birthday, onFire }: Props) {
   const initials = getPlayerInitials(name)
   const [c1, c2] = gradientFor(name)
   const celebrate = isBirthdayWeek(birthday) && !eliminated
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {onFire && (
+        // Behind the avatar so the flames lick out around its edge (and under a birthday wreath).
+        <div
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${eliminated ? 'opacity-40' : ''}`}
+          style={{ width: size * 1.5, height: size * 1.5 }}
+        >
+          <FireRing />
+        </div>
+      )}
       <div
-        className={`w-full h-full rounded-full flex items-center justify-center font-semibold text-white overflow-hidden transition-all duration-200
+        className={`relative w-full h-full rounded-full flex items-center justify-center font-semibold text-white overflow-hidden transition-all duration-200
           ${eliminated ? 'opacity-30 grayscale' : ''}
           ${isWinner ? 'ring-[3px] ring-[#2E6B3A] ring-offset-2 ring-offset-[#F4ECDA]' : ''}
         `}
