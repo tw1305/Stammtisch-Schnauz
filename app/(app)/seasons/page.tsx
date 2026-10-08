@@ -36,6 +36,7 @@ export default function SeasonsPage() {
   const [settlements, setSettlements] = useState<DebtSettlement[]>([])
   const [seasonBalances, setSeasonBalances] = useState<{ player: Player; total: number }[]>([])
   const [sessionsData, setSessionsData] = useState<SessionWithRounds[]>([])
+  const [playerNames, setPlayerNames] = useState<Record<string, string>>({}) // for round winners
   const [editingRound, setEditingRound] = useState<Round | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
@@ -198,6 +199,7 @@ export default function SeasonsPage() {
       if (!balMap[rp.player_id]) balMap[rp.player_id] = { player: p, total: 0 }
       if (rp.balance_change != null) balMap[rp.player_id].total += rp.balance_change
     }
+    setPlayerNames(Object.fromEntries(Object.values(balMap).map(b => [b.player.id, b.player.name])))
     const bals = Object.values(balMap).sort((a, b) => b.total - a.total)
     setSeasonBalances(bals)
     setSettlements(calculateSettlements(bals))
@@ -374,7 +376,7 @@ export default function SeasonsPage() {
                     </div>
 
                     {/* Collapsed: the same scoreboard shown when a session ends */}
-                    <div className="px-1.5 py-1.5">
+                    <div className="px-1.5 py-0.5">
                       <SessionSummaryView summary={summary} compact />
                     </div>
 
@@ -386,12 +388,21 @@ export default function SeasonsPage() {
                     ) : (
                       rounds.map(r => (
                         <div key={r.id} className="flex items-center justify-between px-4 py-2.5 border-b border-[#E4D9BF] last:border-0">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[#23201A] text-sm">
+                          <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                            <span className="text-[#23201A] text-sm shrink-0">
                               {r.round_number === 0 ? 'Saldovortrag' : `Runde ${r.round_number}`}
                             </span>
                             {r.round_number > 0 && (
-                              <span className="text-[#7C7461] text-xs ml-2">{r.stake} €</span>
+                              <span className="text-[#7C7461] text-xs shrink-0">{r.stake} €</span>
+                            )}
+                            {r.round_number > 0 && (
+                              r.status === 'active' ? (
+                                <span className="text-[#7C7461] text-xs italic truncate">läuft</span>
+                              ) : r.winner_id ? (
+                                <span className="text-[#2E6B3A] text-xs font-semibold truncate min-w-0">
+                                  👑 {playerNames[r.winner_id] ?? '?'}
+                                </span>
+                              ) : null
                             )}
                           </div>
                           <div className="flex items-center gap-1.5">

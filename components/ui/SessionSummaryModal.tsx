@@ -22,9 +22,9 @@ export function SessionSummaryView({ summary, compact = false }: { summary: Sess
   if (compact) {
     // Dense one-line-per-player list (no avatars) for the season overview cards.
     return (
-      <div>
+      <div className="divide-y divide-[#E4D9BF]">
         {summary.players.map(p => (
-          <div key={p.player.id} className="flex items-center gap-2 px-2 py-[3px] text-sm leading-tight">
+          <div key={p.player.id} className="flex items-center gap-2 px-2 py-1.5 text-sm leading-tight">
             <span className="text-[#23201A] font-medium truncate min-w-0">{p.player.name}</span>
             <span className="text-[#7C7461] text-xs shrink-0 whitespace-nowrap">
               {p.wins} {p.wins === 1 ? 'Sieg' : 'Siege'}
