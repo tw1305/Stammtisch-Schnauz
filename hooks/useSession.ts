@@ -24,6 +24,7 @@ export function useSession() {
     players: RoundPlayer[]
     winnerId: string
     reactivatePlayerId: string
+    prevDealerId: string | null
   } | null>(null)
 
   const loadActiveSession = useCallback(async () => {
@@ -144,6 +145,12 @@ export function useSession() {
   }
 
   async function removePlayerFromSession(sessionPlayerId: string) {
+    // If the dealer leaves the table, pass the deal to the next seat.
+    const idx = sessionPlayers.findIndex(sp => sp.id === sessionPlayerId)
+    if (session && idx >= 0 && sessionPlayers[idx].player_id === session.dealer_player_id && sessionPlayers.length > 1) {
+      const next = sessionPlayers[(idx + 1) % sessionPlayers.length]
+      await supabase.from('sessions').update({ dealer_player_id: next.player_id }).eq('id', session.id)
+    }
     await supabase
       .from('session_players')
       .update({ removed_at: new Date().toISOString() })
@@ -243,10 +250,15 @@ export function useSession() {
     const rp = roundPlayers.find(r => r.player_id === playerId)
     if (!rp || !rp.is_active) return
 
-    const firstEliminated = roundPlayers.every(r => r.is_active || r.player_id === playerId)
+    // Only one player per round may carry the "first out" flag, and an existing
+    // flag is never cleared here (a revived first-out player re-eliminated used
+    // to lose it, leaving the round without a loser → dealer not updated).
+    const firstEliminated =
+      !roundPlayers.some(r => r.was_first_eliminated) &&
+      roundPlayers.every(r => r.is_active || r.player_id === playerId)
     await supabase
       .from('round_players')
-      .update({ is_active: false, was_first_eliminated: firstEliminated && !rp.was_revived })
+      .update(firstEliminated ? { is_active: false, was_first_eliminated: true } : { is_active: false })
       .eq('id', rp.id)
 
     setUndoStack(s => [...s, { kind: 'eliminate', rpId: rp.id, prevWasFirst: rp.was_first_eliminated }])
@@ -344,7 +356,8 @@ export function useSession() {
       .eq('id', activeRound.id)
 
     // The player who was first out this round deals the next one.
-    const firstOut = players.find(p => p.was_first_eliminated)
+    const prevDealerId = session?.dealer_player_id ?? null
+    const firstOut = players.find(p => p.was_first_eliminated && p.player_id !== winnerId)
     if (firstOut && session) {
       await supabase.from('sessions').update({ dealer_player_id: firstOut.player_id }).eq('id', session.id)
     }
@@ -359,6 +372,7 @@ export function useSession() {
       players: finalRp || [],
       winnerId,
       reactivatePlayerId: lastEliminatedId,
+      prevDealerId,
     })
     setUndoStack([])
     setActiveRound(null)
@@ -384,6 +398,10 @@ export function useSession() {
       .from('rounds')
       .update({ status: 'active', winner_id: null, ended_at: null })
       .eq('id', roundId)
+    // The reopened round was dealt by the previous dealer, not by its first-out player.
+    if (session && completedRound.prevDealerId) {
+      await supabase.from('sessions').update({ dealer_player_id: completedRound.prevDealerId }).eq('id', session.id)
+    }
 
     setCompletedRound(null)
     setUndoStack([])
