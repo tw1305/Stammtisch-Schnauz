@@ -35,7 +35,15 @@ function writeFlag(key: string, on: boolean) {
 export const feedbackEnabled = () => readFlag(SOUND_KEY)
 export const setFeedbackEnabled = (on: boolean) => writeFlag(SOUND_KEY, on)
 export const animationsEnabled = () => readFlag(ANIM_KEY)
-export const setAnimationsEnabled = (on: boolean) => writeFlag(ANIM_KEY, on)
+export const setAnimationsEnabled = (on: boolean) => {
+  writeFlag(ANIM_KEY, on)
+  applyAnimationPref()
+}
+
+/** Mirrors the preference on <html data-anim> so CSS can pause looping ring animations. */
+export function applyAnimationPref() {
+  if (typeof document !== 'undefined') document.documentElement.dataset.anim = animationsEnabled() ? 'on' : 'off'
+}
 
 // ---------- Audio engine ----------
 
@@ -194,6 +202,7 @@ let initialized = false
 export function initFeedback() {
   if (initialized || typeof window === 'undefined') return
   initialized = true
+  applyAnimationPref()
   const unlock = () => {
     if (!feedbackEnabled()) return
     const a = audio()

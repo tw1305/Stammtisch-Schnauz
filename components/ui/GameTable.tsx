@@ -13,7 +13,8 @@ type GameTableProps = {
   onPlayerTap?: (playerId: string) => void
   isRoundActive?: boolean
   dealerId?: string | null
-  onFireIds?: Set<string>
+  /** Current winning streak per player (gold ring / glowing ring / flames). */
+  winStreaks?: Map<string, number>
   /** One-shot animations (R.I.P., revive, fire) anchored on a player */
   effects?: GameEffect[]
 }
@@ -138,7 +139,7 @@ export default function GameTable({
   onPlayerTap,
   isRoundActive = false,
   dealerId = null,
-  onFireIds,
+  winStreaks,
   effects = [],
 }: GameTableProps) {
   const boxRef = useRef<HTMLDivElement>(null)
@@ -299,7 +300,7 @@ export default function GameTable({
                 eliminated={isEliminated}
                 isWinner={isWinner}
                 birthday={player.birthday}
-                onFire={onFireIds?.has(sp.player_id)}
+                winStreak={winStreaks?.get(sp.player_id) ?? 0}
               />
               {dealerId === sp.player_id && (
                 <span

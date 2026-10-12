@@ -2,6 +2,8 @@ import { getPlayerInitials } from '@/lib/game-logic'
 import { isBirthdayWeek } from '@/lib/birthday'
 import LaurelWreath from './LaurelWreath'
 import FireRing from './FireRing'
+import WinRing from './WinRing'
+import { ON_FIRE_STREAK } from '@/lib/stats'
 
 const GRADIENTS: [string, string][] = [
   ['#6366F1', '#8B5CF6'],
@@ -28,21 +30,41 @@ type Props = {
   eliminated?: boolean
   isWinner?: boolean
   birthday?: string | null
-  /** Won the last three rounds in a row → ring of flames */
-  onFire?: boolean
+  /**
+   * Current winning streak: 1 → golden ring, 2 → glowing golden ring,
+   * ON_FIRE_STREAK (3) or more → ring of flames.
+   */
+  winStreak?: number
+  /** Animate the ring/flames in (round-end award), after `ringDelay` seconds. */
+  ringAppear?: boolean
+  ringDelay?: number
 }
 
-export default function PlayerAvatar({ name, avatarUrl, size = 48, eliminated, isWinner, birthday, onFire }: Props) {
+export default function PlayerAvatar({
+  name,
+  avatarUrl,
+  size = 48,
+  eliminated,
+  isWinner,
+  birthday,
+  winStreak = 0,
+  ringAppear = false,
+  ringDelay = 0,
+}: Props) {
   const initials = getPlayerInitials(name)
   const [c1, c2] = gradientFor(name)
   const celebrate = isBirthdayWeek(birthday) && !eliminated
+  const onFire = winStreak >= ON_FIRE_STREAK
+  const goldTier = winStreak === 1 ? 1 : winStreak === 2 ? 2 : 0
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       {onFire && (
         // Behind the avatar so the flames lick out around its edge (and under a birthday wreath).
         <div className={`absolute inset-0 pointer-events-none ${eliminated ? 'opacity-40' : ''}`}>
-          <FireRing size={size} />
+          <div className={`absolute inset-0 ${ringAppear ? 'wr-ignite' : ''}`} style={ringAppear ? { animationDelay: `${ringDelay}s` } : undefined}>
+            <FireRing size={size} />
+          </div>
         </div>
       )}
       <div
@@ -63,6 +85,12 @@ export default function PlayerAvatar({ name, avatarUrl, size = 48, eliminated, i
           <span style={{ fontFamily: 'var(--font-display)' }}>{initials}</span>
         )}
       </div>
+
+      {goldTier > 0 && (
+        <div className={`absolute inset-0 pointer-events-none ${eliminated ? 'opacity-40' : ''}`}>
+          <WinRing size={size} tier={goldTier as 1 | 2} appear={ringAppear} delay={ringDelay} />
+        </div>
+      )}
 
       {celebrate && (
         <div

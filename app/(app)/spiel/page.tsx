@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
@@ -12,7 +12,7 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import { computeSessionSummary, computeOnFirePlayers } from '@/lib/stats'
+import { computeSessionSummary, computeWinStreaks } from '@/lib/stats'
 import {
   feedbackEliminate,
   feedbackRevive,
@@ -79,7 +79,7 @@ export default function SpielPage() {
   const [reviveTarget, setReviveTarget] = useState<string | null>(null)
   const [endData, setEndData] = useState<{ session: SessionSummary; season: SeasonSummary | null } | null>(null)
   const [showFirePicker, setShowFirePicker] = useState(false)
-  const [onFireIds, setOnFireIds] = useState<Set<string>>(new Set())
+  const [winStreaks, setWinStreaks] = useState<Map<string, number>>(new Map())
   const [effects, setEffects] = useState<GameEffect[]>([])
   const [coinRain, setCoinRain] = useState(false)
   const effectId = useRef(0)
@@ -101,18 +101,27 @@ export default function SpielPage() {
     setTimeout(() => setEffects(list => list.filter(e => e.id !== id)), EFFECT_DURATION[kind])
   }
 
-  // "On fire" = won own last 3 rounds (across sessions/seasons). Recompute whenever
-  // the table changes or a round starts/ends.
+  // Winning streaks (across sessions/seasons) drive the gold ring / glow / flames.
+  // Recompute whenever the table changes or a round starts/ends.
   const tableKey = sessionPlayers.map(sp => sp.player_id).join(',')
   useEffect(() => {
     let cancelled = false
     const ids = tableKey ? tableKey.split(',') : []
-    computeOnFirePlayers(supabase, ids)
-      .then(set => { if (!cancelled) setOnFireIds(set) })
+    computeWinStreaks(supabase, ids)
+      .then(map => { if (!cancelled) setWinStreaks(map) })
       .catch(() => {})
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableKey, activeRound?.id, completedRound?.round.id])
+
+  // The winner's streak including the round that just ended: their streak before
+  // this round (still in winStreaks when the result first renders) plus this win.
+  // Frozen per round so the later recompute doesn't count the win twice.
+  const winnerStreak = useMemo(
+    () => (completedRound ? (winStreaks.get(completedRound.winnerId) ?? 0) + 1 : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [completedRound?.round.id]
+  )
 
   useEffect(() => {
     if (activeSeason) loadSeasonBalances()
@@ -414,7 +423,7 @@ export default function SpielPage() {
             onPlayerTap={handlePlayerTap}
             isRoundActive={true}
             dealerId={dealerId}
-            onFireIds={onFireIds}
+            winStreaks={winStreaks}
             effects={effects}
           />
         </div>
@@ -486,7 +495,7 @@ export default function SpielPage() {
           sessionBalances={sessionBalances}
           isRoundActive={false}
           dealerId={dealerId}
-          onFireIds={onFireIds}
+          winStreaks={winStreaks}
         />
       </div>
 
@@ -588,6 +597,7 @@ export default function SpielPage() {
       {completedRound && (
         <RoundResultModal
           winnerId={completedRound.winnerId}
+          winnerStreak={winnerStreak}
           players={completedRound.players}
           sessionBalances={sessionBalances}
           onNewRound={dismissCompletedRound}

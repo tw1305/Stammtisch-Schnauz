@@ -40,7 +40,10 @@ export default function FireRing({ size }: { size: number }) {
     const cy = h * CY
     const R = size / 2
     const particles: P[] = []
-    const rate = Math.max(8, Math.round(size / 4.5)) // particles per frame
+    // Particles per frame grow sub-linearly with size: large rings would otherwise
+    // add up to white (additive blending) instead of staying orange.
+    const rate = Math.max(8, Math.round(size <= 70 ? size / 4.5 : 15.5 + (size - 70) / 12))
+    const alpha = size <= 70 ? 0.85 : Math.max(0.55, 0.85 - (size - 70) * 0.004)
     const reduce =
       !animationsEnabled() || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
@@ -98,7 +101,7 @@ export default function FireRing({ size }: { size: number }) {
         const shrink = 1 - k * 0.75
         const rad = p.r * shrink
         const idx = Math.min(FIRE_SPRITE_STEPS - 1, Math.floor(k * FIRE_SPRITE_STEPS))
-        g!.globalAlpha = k > 0.75 ? (1 - k) * 2.4 : 0.85
+        g!.globalAlpha = k > 0.75 ? (1 - k) * 2.4 * (alpha / 0.85) : alpha
         g!.drawImage(spr[idx], p.x - rad, p.y - rad * 1.3, rad * 2, rad * 2.6) // taller than wide = flame tongue
       }
       g!.globalAlpha = 1

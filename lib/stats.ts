@@ -141,13 +141,14 @@ export async function computeScopeSummary(supabase: Supa, seasonId?: string | nu
 export const ON_FIRE_STREAK = 3
 
 /**
- * Players currently "on fire": they won each of their own last ON_FIRE_STREAK
- * completed real rounds. The streak is computed over the player's rounds in
- * chronological order regardless of session or season boundaries, so sessions
- * (or seasons) a player skipped do not break it.
+ * Current winning streak per player: how many of their own most recent
+ * completed real rounds they won in a row (only players with a streak ≥ 1 are
+ * returned). Counted over the player's rounds in chronological order regardless
+ * of session or season boundaries, so sessions a player skipped don't break it.
+ * 1 → golden ring, 2 → glowing golden ring, ON_FIRE_STREAK+ → ring of flames.
  */
-export async function computeOnFirePlayers(supabase: Supa, playerIds: string[]): Promise<Set<string>> {
-  const result = new Set<string>()
+export async function computeWinStreaks(supabase: Supa, playerIds: string[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>()
   if (playerIds.length === 0) return result
   const rows = await fetchByIds<{
     player_id: string
@@ -162,7 +163,12 @@ export async function computeOnFirePlayers(supabase: Supa, playerIds: string[]):
   }
   for (const [pid, list] of Object.entries(byPlayer)) {
     list.sort((a, b) => b.at - a.at) // newest first
-    if (list.length >= ON_FIRE_STREAK && list.slice(0, ON_FIRE_STREAK).every(x => x.won)) result.add(pid)
+    let streak = 0
+    for (const x of list) {
+      if (!x.won) break
+      streak++
+    }
+    if (streak > 0) result.set(pid, streak)
   }
   return result
 }
