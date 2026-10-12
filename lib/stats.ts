@@ -64,7 +64,6 @@ function emptyStats(player: Player): PlayerStats {
     revivals: 0,
     revives_given: 0,
     final_appearances: 0,
-    win_streak: 0,
     longest_streak: 0,
     rounds_played: 0,
     win_rate: 0,
@@ -287,7 +286,6 @@ export async function computePlayerStats(
     s.peak_balance = history.length > 0 ? Math.max(...history) : 0
     s.low_balance = history.length > 0 ? Math.min(...history) : 0
     s.longest_streak = longest
-    s.win_streak = cur // trailing streak over participated real rounds
     s.win_rate = s.rounds_played > 0 ? s.wins / s.rounds_played : 0
   }
 
@@ -304,6 +302,8 @@ export const ACHIEVEMENTS: {
   desc: string
   min: number
   pick: (s: PlayerStats) => number
+  /** Show the achieved value (e.g. streak length) instead of how often it was earned. */
+  showValue?: boolean
 }[] = [
   { icon: '💰', label: 'Bonze', desc: 'Höchste Gesamtbilanz der Season', min: 1, pick: s => s.total_balance },
   { icon: '🌟', label: 'Münzstern', desc: 'Höchster Saldo, der in der Season je erreicht wurde', min: 1, pick: s => s.peak_balance },
@@ -312,8 +312,9 @@ export const ACHIEVEMENTS: {
   { icon: '🏆', label: 'Seriensieger', desc: 'Meiste Rundensiege der Season', min: 1, pick: s => s.wins },
   { icon: '🎲', label: 'High Roller', desc: `Höchster €-Wert gewonnener Runden über ${BASE_STAKE} € Einsatz`, min: 1, pick: s => s.high_stake_score },
   { icon: '🐜', label: 'Kleinvieh', desc: `Meiste gewonnene ${BASE_STAKE}-€-Runden der Season`, min: 1, pick: s => s.base_stake_wins },
-  // ☄️ instead of 🔥: the flame now stands for tracked "Feuer" (three aces).
-  { icon: '☄️', label: 'Hot Streak', desc: 'Längste Siegesserie der Season (≥3)', min: 3, pick: s => s.longest_streak },
+  // ☄️ instead of 🔥: the flame stands for tracked "Feuer" (three aces) / Burning Man.
+  { icon: '☄️', label: 'Hot Streak', desc: 'Längste Siegesserie der Season – meiste Siege am Stück (ab 3)', min: 3, pick: s => s.longest_streak, showValue: true },
+  { icon: '🔥', label: 'Burning Man', desc: 'Meiste Feuer (drei Asse) der Season', min: 1, pick: s => s.fires },
   { icon: '🩸', label: 'First Blood', desc: 'Hat in der Season am häufigsten die erste Runde einer Session gewonnen', min: 1, pick: s => s.first_bloods },
   { icon: '👻', label: 'Aus dem Jenseits', desc: 'Am häufigsten ausgeschieden, wiederbelebt und dann die Runde gewonnen', min: 1, pick: s => s.comebacks },
   { icon: '🐦', label: 'Phönix', desc: 'In der Season am häufigsten wiederbelebt', min: 1, pick: s => s.revivals },
@@ -331,7 +332,9 @@ export function deriveBadges(allStats: PlayerStats[]): Record<string, Badge[]> {
     for (const s of allStats) max = Math.max(max, a.pick(s))
     if (max < a.min) continue
     for (const s of allStats) {
-      if (a.pick(s) === max) result[s.player.id].push({ icon: a.icon, label: a.label, desc: a.desc })
+      if (a.pick(s) === max) {
+        result[s.player.id].push({ icon: a.icon, label: a.label, desc: a.desc, ...(a.showValue ? { value: max } : {}) })
+      }
     }
   }
 
@@ -347,6 +350,7 @@ export async function computeSeasonAchievements(
 ): Promise<Record<string, AchievementTally[]>> {
   const { data: seasons } = await supabase.from('seasons').select('id')
   const counts: Record<string, Record<string, number>> = {}
+  const best: Record<string, Record<string, number>> = {}
 
   for (const season of seasons || []) {
     const stats = await computePlayerStats(supabase, { seasonId: season.id })
@@ -355,6 +359,10 @@ export async function computeSeasonAchievements(
       for (const b of list) {
         if (!counts[pid]) counts[pid] = {}
         counts[pid][b.label] = (counts[pid][b.label] ?? 0) + 1
+        if (b.value != null) {
+          if (!best[pid]) best[pid] = {}
+          best[pid][b.label] = Math.max(best[pid][b.label] ?? 0, b.value)
+        }
       }
     }
   }
@@ -366,6 +374,7 @@ export async function computeSeasonAchievements(
       label: a.label,
       desc: a.desc,
       count: byLabel[a.label],
+      ...(best[pid]?.[a.label] != null ? { value: best[pid][a.label] } : {}),
     }))
   }
   return result

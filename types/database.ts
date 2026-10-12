@@ -94,8 +94,7 @@ export type PlayerStats = {
   revivals: number
   revives_given: number
   final_appearances: number
-  win_streak: number
-  longest_streak: number
+  longest_streak: number // longest run of consecutive round wins in scope (Hot Streak)
   rounds_played: number
   win_rate: number // 0..1
   total_balance: number
@@ -113,6 +112,8 @@ export type Badge = {
   icon: string
   label: string
   desc: string
+  /** Set for achievements measured by a length rather than a count (Hot Streak: wins in a row). */
+  value?: number
 }
 
 /** Per-session scoreboard, shown when a session ends and when reviewing it later. */
@@ -139,6 +140,7 @@ export type AchievementTally = {
   label: string
   desc: string
   count: number // how many seasons this achievement was earned
+  value?: number // best value across those seasons, for value-type achievements (Hot Streak length)
 }
 
 export type DebtSettlement = {

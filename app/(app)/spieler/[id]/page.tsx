@@ -104,7 +104,7 @@ export default function PlayerDetailPage() {
             {achievements.map(a => (
               <span key={a.label} title={a.desc} className="inline-flex items-center gap-1 bg-[#FBF6EA] border border-[#E4D9BF] rounded-full px-2.5 py-1 text-xs text-[#23201A]">
                 <span>{a.icon}</span><span className="font-medium">{a.label}</span>
-                <span className="font-bold text-[#2E6B3A]">×{a.count}</span>
+                <span className="font-bold text-[#2E6B3A]">{a.value != null ? `${a.value} am Stück` : `×${a.count}`}</span>
               </span>
             ))}
           </div>
@@ -128,7 +128,7 @@ export default function PlayerDetailPage() {
             <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
               <Cell icon="💉" label="Wiederbelebt" value={stat.revivals} />
               <Cell icon="🤝" label="Belebt" value={stat.revives_given} />
-              <Cell icon="⚡" label="Serie" value={stat.win_streak} />
+              <Cell icon="☄️" label="Hot Streak" value={stat.longest_streak} />
             </div>
             <div className="grid grid-cols-2 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
               <Cell icon="🩸" label="First Blood" value={stat.first_bloods} />

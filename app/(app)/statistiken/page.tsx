@@ -18,7 +18,7 @@ const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] =
   { key: 'revived', label: 'Wiederbelebt', get: s => s.revivals },
   { key: 'given', label: 'Andere belebt', get: s => s.revives_given },
   { key: 'finals', label: 'Finalteilnahmen', get: s => s.final_appearances },
-  { key: 'streak', label: 'Aktuelle Serie', get: s => s.win_streak },
+  { key: 'hotstreak', label: 'Hot Streak', get: s => s.longest_streak },
   { key: 'fires', label: 'Feuer', get: s => s.fires },
   { key: 'firstblood', label: 'First Blood', get: s => s.first_bloods },
   { key: 'comeback', label: 'Aus dem Jenseits', get: s => s.comebacks },
@@ -184,7 +184,7 @@ export default function StatistikenPage() {
                           ? playerAch.slice(0, MAX_INLINE_BADGES).map(a => (
                               <span key={a.label} className="inline-flex items-center gap-px" title={a.label}>
                                 <span className="text-xs">{a.icon}</span>
-                                <span className="text-[10px] font-semibold text-[#7C7461]">{a.count}</span>
+                                <span className="text-[10px] font-semibold text-[#7C7461]">{a.value ?? a.count}</span>
                               </span>
                             ))
                           : playerBadges.slice(0, MAX_INLINE_BADGES).map(b => (
@@ -221,7 +221,7 @@ export default function StatistikenPage() {
                     <div className="grid grid-cols-3 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="💉" label="Wiederbelebt" value={s.revivals} />
                       <StatCell icon="🤝" label="Belebt" value={s.revives_given} />
-                      <StatCell icon="⚡" label="Serie" value={s.win_streak} />
+                      <StatCell icon="☄️" label="Hot Streak" value={s.longest_streak} />
                     </div>
                     <div className="grid grid-cols-2 divide-x divide-[#E4D9BF] border-t border-[#E4D9BF]">
                       <StatCell icon="🩸" label="First Blood" value={s.first_bloods} />
@@ -270,7 +270,9 @@ function BadgeChip({ badge, count }: { badge: Badge; count?: number }) {
     >
       <span>{badge.icon}</span>
       <span className="font-medium">{badge.label}</span>
-      {count != null && <span className="font-bold text-[#2E6B3A]">×{count}</span>}
+      {badge.value != null
+        ? <span className="font-bold text-[#2E6B3A]">{badge.value} am Stück</span>
+        : count != null && <span className="font-bold text-[#2E6B3A]">×{count}</span>}
     </span>
   )
 }
