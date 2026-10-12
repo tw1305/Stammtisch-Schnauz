@@ -5,7 +5,9 @@ import { useId } from 'react'
 /**
  * Golden ring around the profile picture of a player on a winning streak:
  * - tier 1 (won the last round): gold ring with a sheen running around it
- * - tier 2 (won the last two rounds): same ring, additionally glowing/pulsing
+ * - tier 2 (won the last two rounds): the ring is red-hot – orange/red gradient,
+ *   a blurred heat halo pulsing around it (PlayerAvatar adds smouldering flame
+ *   tongues and sparks on top: it's about to catch fire)
  * (From the third win in a row the FireRing takes over.)
  * With `appear`, the ring draws itself in — used for the round-end award.
  */
@@ -21,7 +23,8 @@ export default function WinRing({
   delay?: number // seconds before the draw-in starts
 }) {
   const id = useId().replace(/:/g, '')
-  const stroke = Math.max(3, size * 0.065)
+  const hot = tier === 2
+  const stroke = Math.max(3, size * (hot ? 0.08 : 0.065))
   const r = 50 - (stroke / size) * 50 // radius in viewBox units, ring sits on the avatar edge
   const sw = (stroke / size) * 100
 
@@ -41,20 +44,45 @@ export default function WinRing({
             <stop offset="0.7" stopColor="#C9971F" />
             <stop offset="1" stopColor="#FFE07A" />
           </linearGradient>
+          <linearGradient id={`wr-hot-${id}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#FFF4B8" />
+            <stop offset="0.3" stopColor="#FFB02E" />
+            <stop offset="0.6" stopColor="#FF5A1A" />
+            <stop offset="0.85" stopColor="#D8321A" />
+            <stop offset="1" stopColor="#FFD34D" />
+          </linearGradient>
+          <filter id={`wr-blur-${id}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.2" />
+          </filter>
           <linearGradient id={`wr-sheen-${id}`} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
             <stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0.95" />
             <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
           </linearGradient>
         </defs>
+        {/* Hot ring: blurred, pulsing heat halo underneath */}
+        {hot && (
+          <circle
+            cx="50"
+            cy="50"
+            r={r}
+            fill="none"
+            stroke="#FF7A1A"
+            strokeWidth={sw * 2.6}
+            filter={`url(#wr-blur-${id})`}
+            className="wr-heat"
+            // When drawn in, the heat only starts once the ring is (almost) complete.
+            style={appear ? { opacity: 0, animationDelay: `${delay + 0.6}s` } : undefined}
+          />
+        )}
         {/* Dark outline for contrast on light and dark avatars */}
-        <circle cx="50" cy="50" r={r} fill="none" stroke="#7A5512" strokeOpacity="0.55" strokeWidth={sw + 1.6} />
+        <circle cx="50" cy="50" r={r} fill="none" stroke={hot ? '#7A1E0A' : '#7A5512'} strokeOpacity="0.55" strokeWidth={sw + 1.6} />
         <circle
           cx="50"
           cy="50"
           r={r}
           fill="none"
-          stroke={`url(#wr-gold-${id})`}
+          stroke={hot ? `url(#wr-hot-${id})` : `url(#wr-gold-${id})`}
           strokeWidth={sw}
           pathLength={100}
           transform="rotate(-90 50 50)"

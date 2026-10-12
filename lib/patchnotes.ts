@@ -31,7 +31,7 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'neu', text: 'Testmodus 🧪 in den Einstellungen: Seasons, Sessions und Runden zum Ausprobieren spielen, ohne dass echte Daten oder Statistiken verändert werden. Ein lila Banner zeigt an, wenn er aktiv ist.' },
       { type: 'neu', text: 'Test-Buttons für Sound & Vibration in den Einstellungen.' },
       { type: 'verbessert', text: 'Laufende Runde: Die Spielfläche nutzt jetzt den ganzen Bildschirm und die Spielericons sind deutlich größer – auf jedem Gerät ist alles ohne Scrollen sichtbar.' },
-      { type: 'neu', text: 'Siegesserien sichtbar am Profilbild: nach einem Sieg ein goldener schimmernder Ring, nach zwei Siegen in Folge glüht er, ab drei Siegen brennt das Feuer.' },
+      { type: 'neu', text: 'Siegesserien sichtbar am Profilbild: nach einem Sieg ein goldener schimmernder Ring, nach zwei Siegen in Folge glüht er rot und erste Flammen und Funken züngeln, ab drei Siegen brennt das Feuer.' },
       { type: 'neu', text: 'Rundenende: Der Sieger erscheint groß in der Bildschirmmitte, bekommt Ring oder Flamme per Animation und fliegt dann in die (jetzt größere) Rundenübersicht.' },
       { type: 'verbessert', text: 'Der Feuerring sieht jetzt aus wie echtes Feuer statt wie gezeichnete Flammen.' },
       { type: 'verbessert', text: 'Hot Streak ☄️ zeigt die Länge der Siegesserie (z. B. „4 am Stück“) und wird auch bei kurzen Serien vergeben.' },

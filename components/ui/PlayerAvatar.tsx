@@ -67,6 +67,15 @@ export default function PlayerAvatar({
           </div>
         </div>
       )}
+      {goldTier === 2 && (
+        // About to catch fire: small flame tongues and sparks behind the red-hot ring.
+        <div className={`absolute inset-0 pointer-events-none ${eliminated ? 'opacity-40' : ''}`}>
+          <div className={`absolute inset-0 ${ringAppear ? 'wr-ignite' : ''}`} style={ringAppear ? { animationDelay: `${ringDelay + 0.5}s` } : undefined}>
+            <FireRing size={size} level="ember" />
+          </div>
+        </div>
+      )}
+
       <div
         className={`relative w-full h-full rounded-full flex items-center justify-center font-semibold text-white overflow-hidden transition-[filter,opacity,box-shadow] duration-700 ease-out
           ${eliminated ? 'opacity-30 grayscale' : ''}
