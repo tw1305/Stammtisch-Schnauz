@@ -39,7 +39,9 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'verbessert', text: 'Der Feuerring sieht jetzt aus wie echtes Feuer statt wie gezeichnete Flammen.' },
       { type: 'verbessert', text: 'Hot Streak ☄️ zeigt die Länge der Siegesserie (z. B. „4 am Stück“) und wird auch bei kurzen Serien vergeben.' },
       { type: 'behoben', text: 'Der Sound blieb meist stumm, besonders beim Rundensieg – jetzt zuverlässig und lauter.' },
+      { type: 'neu', text: 'Statistik: neue Kennzahl „Ø Spieler“ – wie viele im Schnitt pro Runde mitspielen. Reihenfolge jetzt Sessions, Runden, Ø Einsatz, Ø Spieler, Feuer.' },
       { type: 'entfernt', text: 'Statistik „Serie“ – ersetzt durch Hot Streak.' },
+      { type: 'entfernt', text: 'Kennzahl „Wiederbelebt“ oben in der Statistik (pro Spieler weiterhin sichtbar).' },
     ],
   },
   {

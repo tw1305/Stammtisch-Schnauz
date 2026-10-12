@@ -118,21 +118,21 @@ async function roundIdsForScope(supabase: Supa, seasonId?: string | null): Promi
 
 /**
  * Key figures for the statistics header: real rounds played, sessions with at
- * least one real round, average stake, revivals and fires within the scope.
+ * least one real round, average stake, average players per round and fires within the scope.
  */
 export async function computeScopeSummary(supabase: Supa, seasonId?: string | null): Promise<ScopeSummary> {
   const real = (await roundIdsForScope(supabase, seasonId)).filter(r => r.round_number > 0)
-  if (real.length === 0) return { rounds: 0, sessions: 0, avg_stake: 0, revivals: 0, fires: 0 }
+  if (real.length === 0) return { rounds: 0, sessions: 0, avg_stake: 0, avg_players: 0, fires: 0 }
   const ids = real.map(r => r.id)
-  const revived = (
-    await fetchByIds<{ was_revived: boolean }>(supabase, 'round_players', 'id, was_revived', 'round_id', ids)
-  ).filter(r => r.was_revived).length
+  const seats = (
+    await fetchByIds<{ id: string }>(supabase, 'round_players', 'id', 'round_id', ids)
+  ).length
   const fires = (await loadFires(supabase, ids)).length
   return {
     rounds: real.length,
     sessions: new Set(real.map(r => r.session_id)).size,
     avg_stake: Math.round((real.reduce((a, r) => a + r.stake, 0) / real.length) * 10) / 10,
-    revivals: revived,
+    avg_players: Math.round((seats / real.length) * 10) / 10,
     fires,
   }
 }

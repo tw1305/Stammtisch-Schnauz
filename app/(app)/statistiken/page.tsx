@@ -134,10 +134,10 @@ export default function StatistikenPage() {
         {/* Key figures for the selected scope */}
         {scope && (
           <div className="mt-3 grid grid-cols-5 bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl divide-x divide-[#E4D9BF]">
-            <KeyFigure label="Runden" value={scope.rounds} />
             <KeyFigure label="Sessions" value={scope.sessions} />
+            <KeyFigure label="Runden" value={scope.rounds} />
             <KeyFigure label="Ø Einsatz" value={`${scope.avg_stake.toLocaleString('de-DE')} €`} />
-            <KeyFigure label="Wiederbelebt" value={scope.revivals} icon="💉" />
+            <KeyFigure label="Ø Spieler" value={scope.avg_players.toLocaleString('de-DE')} icon="👥" />
             <KeyFigure label="Feuer" value={scope.fires} icon="🔥" />
           </div>
         )}

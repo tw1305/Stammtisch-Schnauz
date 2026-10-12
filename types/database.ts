@@ -88,7 +88,7 @@ export type ScopeSummary = {
   rounds: number
   sessions: number
   avg_stake: number
-  revivals: number
+  avg_players: number
   fires: number
 }
 
