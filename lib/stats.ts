@@ -313,7 +313,7 @@ export const ACHIEVEMENTS: {
   { icon: '🎲', label: 'High Roller', desc: `Höchster €-Wert gewonnener Runden über ${BASE_STAKE} € Einsatz`, min: 1, pick: s => s.high_stake_score },
   { icon: '🐜', label: 'Kleinvieh', desc: `Meiste gewonnene ${BASE_STAKE}-€-Runden der Season`, min: 1, pick: s => s.base_stake_wins },
   // ☄️ instead of 🔥: the flame stands for tracked "Feuer" (three aces) / Burning Man.
-  { icon: '☄️', label: 'Hot Streak', desc: 'Längste Siegesserie der Season – meiste Siege am Stück (ab 3)', min: 3, pick: s => s.longest_streak, showValue: true },
+  { icon: '☄️', label: 'Hot Streak', desc: 'Längste Siegesserie der Season – meiste Siege am Stück', min: 1, pick: s => s.longest_streak, showValue: true },
   { icon: '🔥', label: 'Burning Man', desc: 'Meiste Feuer (drei Asse) der Season', min: 1, pick: s => s.fires },
   { icon: '🩸', label: 'First Blood', desc: 'Hat in der Season am häufigsten die erste Runde einer Session gewonnen', min: 1, pick: s => s.first_bloods },
   { icon: '👻', label: 'Aus dem Jenseits', desc: 'Am häufigsten ausgeschieden, wiederbelebt und dann die Runde gewonnen', min: 1, pick: s => s.comebacks },
