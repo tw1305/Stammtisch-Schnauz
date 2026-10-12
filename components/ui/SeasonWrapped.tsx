@@ -4,7 +4,16 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { computeSeasonWrapped, type Leaders, type SeasonWrapped as Wrapped } from '@/lib/wrapped'
 import { calculateBalances, formatBalance } from '@/lib/game-logic'
-import { animationsEnabled, feedbackEliminate, feedbackFire, feedbackWinner, initFeedback } from '@/lib/feedback'
+import {
+  animationsEnabled,
+  feedbackEliminate,
+  feedbackFire,
+  initFeedback,
+  recapMusicPlaying,
+  resumeRecapMusic,
+  soundEnabled,
+  stopRecapMusic,
+} from '@/lib/feedback'
 import { ON_FIRE_STREAK } from '@/lib/stats'
 import PlayerAvatar from './PlayerAvatar'
 import GhostBurst, { type GhostWave } from './GhostBurst'
@@ -16,7 +25,8 @@ import type { Player, Season } from '@/types/database'
  * Season-Rückblick ("Wrapped"): a full-screen story of the season's highlights.
  * Tap right/left to skip, hold to pause; the progress bar's CSS animation is the
  * slide timer. Interactive slides (player picker, personal card, finale) wait
- * for the viewer instead of auto-advancing.
+ * for the viewer instead of auto-advancing. "I Get Money" runs underneath the
+ * whole story (started by the opening tap, see startRecapMusic).
  */
 
 const SLIDE_MS = 6500
@@ -226,6 +236,19 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
   const [coins, setCoins] = useState(false)
   const [copied, setCopied] = useState(false)
   const press = useRef(0)
+  const [musicOn, setMusicOn] = useState(soundEnabled)
+
+  // Soundtrack: keep it running while the recap is open, fade out on close.
+  useEffect(() => {
+    if (soundEnabled()) resumeRecapMusic()
+    return () => stopRecapMusic()
+  }, [])
+
+  function toggleMusic() {
+    if (musicOn) stopRecapMusic(250)
+    else resumeRecapMusic()
+    setMusicOn(!musicOn)
+  }
 
   useEffect(() => {
     initFeedback()
@@ -302,7 +325,6 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
         bg: BG.gold,
         ms: SLIDE_MS + 1500,
         enter: () => {
-          feedbackWinner()
           if (animationsEnabled()) setCoins(true)
         },
         view: (
@@ -739,6 +761,10 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
         className="fixed inset-0 z-[200] flex flex-col select-none animate-fade-in transition-[background] duration-700"
         style={{ background: slide?.bg ?? BG.forest }}
         onContextMenu={e => e.preventDefault()}
+        // If the browser blocked autoplay, the next tap starts the song.
+        onPointerDownCapture={() => {
+          if (musicOn && !recapMusicPlaying()) resumeRecapMusic()
+        }}
       >
         {/* Progress + close */}
         <div className="shrink-0 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] max-w-md w-full mx-auto">
@@ -762,9 +788,16 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
             <span className="text-xs font-semibold tracking-wide" style={{ color: MUTED }}>
               {season.name} · Rückblick
             </span>
-            <button {...stop} onClick={onClose} aria-label="Schließen" className="w-9 h-9 -mr-1.5 flex items-center justify-center rounded-full text-xl" style={{ color: CREAM }}>
-              ✕
-            </button>
+            <div className="flex items-center -mr-1.5">
+              {soundEnabled() && (
+                <button {...stop} onClick={toggleMusic} aria-label={musicOn ? 'Musik aus' : 'Musik an'} className="w-9 h-9 flex items-center justify-center rounded-full text-lg" style={{ color: CREAM }}>
+                  {musicOn ? '🔊' : '🔇'}
+                </button>
+              )}
+              <button {...stop} onClick={onClose} aria-label="Schließen" className="w-9 h-9 flex items-center justify-center rounded-full text-xl" style={{ color: CREAM }}>
+                ✕
+              </button>
+            </div>
           </div>
         </div>
 

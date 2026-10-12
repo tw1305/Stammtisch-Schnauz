@@ -605,3 +605,69 @@ function synthCoins() {
     if (Math.random() < 0.3) clink(t + rand(0.15, 0.22), f * rand(0.97, 1.02), g * 0.2, pan)
   }
 }
+
+// ---------- Season recap soundtrack ----------
+
+/** 50 Cent – "I Get Money" (full track), looped under the season recap. */
+const RECAP_SONG = '/sounds/recap-song.mp3'
+const RECAP_VOLUME = 0.8
+
+let song: HTMLAudioElement | null = null
+let songFade = 0
+
+function songEl(): HTMLAudioElement {
+  if (!song) {
+    song = new Audio(RECAP_SONG)
+    song.loop = true
+    song.preload = 'auto'
+  }
+  return song
+}
+
+/**
+ * Starts the recap song from the beginning. Call it synchronously inside the
+ * tap that opens the recap: iPhones only let media start from a tap, and once
+ * started there the element may be paused/resumed freely afterwards.
+ */
+export function startRecapMusic() {
+  if (typeof window === 'undefined' || !soundEnabled()) return
+  const el = songEl()
+  clearInterval(songFade)
+  el.volume = RECAP_VOLUME
+  if (!el.paused) return
+  try {
+    el.currentTime = 0
+  } catch {
+    /* not loaded yet — starts at 0 anyway */
+  }
+  void el.play().catch(() => {})
+}
+
+/** Resumes the song (e.g. on a tap if autoplay was blocked); no-op while playing. */
+export function resumeRecapMusic() {
+  if (typeof window === 'undefined' || !soundEnabled()) return
+  const el = songEl()
+  clearInterval(songFade)
+  el.volume = RECAP_VOLUME
+  if (el.paused) void el.play().catch(() => {})
+}
+
+/** Pauses the song, fading out where the browser allows volume changes (not on iPhone). */
+export function stopRecapMusic(fadeMs = 600) {
+  if (!song || song.paused) return
+  const el = song
+  clearInterval(songFade)
+  const steps = Math.max(1, Math.round(fadeMs / 50))
+  let i = 0
+  songFade = window.setInterval(() => {
+    i++
+    el.volume = Math.max(0, RECAP_VOLUME * (1 - i / steps))
+    if (i >= steps) {
+      clearInterval(songFade)
+      el.pause()
+      el.volume = RECAP_VOLUME
+    }
+  }, 50)
+}
+
+export const recapMusicPlaying = () => !!song && !song.paused

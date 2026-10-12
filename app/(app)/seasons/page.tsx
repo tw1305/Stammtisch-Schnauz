@@ -22,7 +22,7 @@ import Portal from '@/components/ui/Portal'
 import { SessionSummaryView } from '@/components/ui/SessionSummaryModal'
 import SeasonWrapped from '@/components/ui/SeasonWrapped'
 import { wrappedAvailable } from '@/lib/wrapped'
-import { initFeedback } from '@/lib/feedback'
+import { initFeedback, startRecapMusic } from '@/lib/feedback'
 
 type SeasonWithStats = Season & { roundCount: number; avgStake: number }
 /** `number` is the chronological session number within the season (1 = oldest). */
@@ -132,6 +132,8 @@ export default function SeasonsPage() {
         .eq('id', season.id)
     } else {
       if (!confirm(`Season "${season.name}" wirklich abschließen?`)) return
+      // The recap opens right after; its song must be started within this tap.
+      if (wrappedAvailable(season) && (seasons.find(x => x.id === season.id)?.roundCount ?? 0) > 0) startRecapMusic()
       await supabase
         .from('seasons')
         .update({ status: 'completed', end_date: new Date().toISOString().split('T')[0] })
@@ -300,7 +302,7 @@ export default function SeasonsPage() {
 
         <div className="px-4 py-2 space-y-6">
           {wrappedAvailable(detailSeason) && seasonBalances.length > 0 && (
-            <WrappedButton onClick={() => setWrappedSeason(detailSeason)} />
+            <WrappedButton onClick={() => { startRecapMusic(); setWrappedSeason(detailSeason) }} />
           )}
 
           {/* Balances */}
@@ -546,7 +548,7 @@ export default function SeasonsPage() {
             </button>
             {wrappedAvailable(s) && s.roundCount > 0 && (
               <div className="px-3 pb-3 -mt-1">
-                <WrappedButton compact onClick={() => setWrappedSeason(s)} />
+                <WrappedButton compact onClick={() => { startRecapMusic(); setWrappedSeason(s) }} />
               </div>
             )}
             </div>
