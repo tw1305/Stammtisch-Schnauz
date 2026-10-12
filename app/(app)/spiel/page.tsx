@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
@@ -11,7 +11,15 @@ import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
 import { computeSessionSummary, computeOnFirePlayers } from '@/lib/stats'
-import { feedbackEliminate, feedbackRevive, feedbackWinner } from '@/lib/feedback'
+import {
+  feedbackEliminate,
+  feedbackRevive,
+  feedbackFire,
+  feedbackWinner,
+  animationsEnabled,
+  initFeedback,
+} from '@/lib/feedback'
+import { CoinRain, EFFECT_DURATION, type EffectKind, type GameEffect } from '@/components/ui/GameEffects'
 import type { Season, Player, RoundPlayer, RoundFire, SessionPlayer } from '@/types/database'
 
 const STAKE_OPTIONS = [
@@ -70,10 +78,22 @@ export default function SpielPage() {
   const [endData, setEndData] = useState<{ session: SessionSummary; season: SeasonSummary | null } | null>(null)
   const [showFirePicker, setShowFirePicker] = useState(false)
   const [onFireIds, setOnFireIds] = useState<Set<string>>(new Set())
+  const [effects, setEffects] = useState<GameEffect[]>([])
+  const [coinRain, setCoinRain] = useState(false)
+  const effectId = useRef(0)
 
   useEffect(() => {
     loadMeta()
+    initFeedback() // unlock audio on the first tap so later sounds are audible
   }, [])
+
+  /** Shows a one-shot animation on a player's seat (if animations are enabled). */
+  function playEffect(kind: EffectKind, playerId: string) {
+    if (!animationsEnabled()) return
+    const id = ++effectId.current
+    setEffects(list => [...list, { id, kind, playerId }])
+    setTimeout(() => setEffects(list => list.filter(e => e.id !== id)), EFFECT_DURATION[kind])
+  }
 
   // "On fire" = won own last 3 rounds (across sessions/seasons). Recompute whenever
   // the table changes or a round starts/ends.
@@ -92,9 +112,11 @@ export default function SpielPage() {
     if (activeSeason) loadSeasonBalances()
   }, [activeSeason, session, completedRound, roundPlayers])
 
-  // Winner feedback when a round completes
+  // Winner feedback when a round completes: coin sound + coin rain
   useEffect(() => {
-    if (completedRound) feedbackWinner()
+    if (!completedRound) return
+    feedbackWinner()
+    if (animationsEnabled()) setCoinRain(true) // eslint-disable-line react-hooks/set-state-in-effect
   }, [completedRound])
 
   async function loadMeta() {
@@ -189,6 +211,7 @@ export default function SpielPage() {
     if (!rp) return
     if (rp.is_active) {
       feedbackEliminate()
+      playEffect('rip', playerId)
       await eliminatePlayer(playerId)
     } else {
       // Reviving requires choosing who revived this player
@@ -377,6 +400,7 @@ export default function SpielPage() {
             isRoundActive={true}
             dealerId={dealerId}
             onFireIds={onFireIds}
+            effects={effects}
           />
         </div>
 
@@ -392,8 +416,9 @@ export default function SpielPage() {
             onAdd={async playerId => {
               const ok = await addFire(playerId)
               if (ok) {
-                feedbackRevive()
                 setShowFirePicker(false)
+                feedbackFire()
+                playEffect('fire', playerId)
               } else {
                 alert('Feuer konnte nicht gespeichert werden. Wurde die Datenbank-Migration (round_fires) schon ausgeführt?')
               }
@@ -412,6 +437,7 @@ export default function SpielPage() {
               setReviveTarget(null)
               if (target) {
                 feedbackRevive()
+                playEffect('revive', target)
                 await revivePlayer(target, reviverId)
               }
             }}
@@ -541,6 +567,8 @@ export default function SpielPage() {
           onClose={() => setShowPlayerManager(false)}
         />
       )}
+
+      {coinRain && <CoinRain onDone={() => setCoinRain(false)} />}
 
       {completedRound && (
         <RoundResultModal

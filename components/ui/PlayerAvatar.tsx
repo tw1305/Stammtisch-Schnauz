@@ -41,15 +41,12 @@ export default function PlayerAvatar({ name, avatarUrl, size = 48, eliminated, i
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       {onFire && (
         // Behind the avatar so the flames lick out around its edge (and under a birthday wreath).
-        <div
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none ${eliminated ? 'opacity-40' : ''}`}
-          style={{ width: size * 1.5, height: size * 1.5 }}
-        >
-          <FireRing />
+        <div className={`absolute inset-0 pointer-events-none ${eliminated ? 'opacity-40' : ''}`}>
+          <FireRing size={size} />
         </div>
       )}
       <div
-        className={`relative w-full h-full rounded-full flex items-center justify-center font-semibold text-white overflow-hidden transition-all duration-200
+        className={`relative w-full h-full rounded-full flex items-center justify-center font-semibold text-white overflow-hidden transition-[filter,opacity,box-shadow] duration-700 ease-out
           ${eliminated ? 'opacity-30 grayscale' : ''}
           ${isWinner ? 'ring-[3px] ring-[#2E6B3A] ring-offset-2 ring-offset-[#F4ECDA]' : ''}
         `}

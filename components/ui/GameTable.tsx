@@ -2,6 +2,7 @@
 
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from './PlayerAvatar'
+import { PlayerEffect, type GameEffect } from './GameEffects'
 import type { SessionPlayer, RoundPlayer } from '@/types/database'
 
 type GameTableProps = {
@@ -12,6 +13,8 @@ type GameTableProps = {
   isRoundActive?: boolean
   dealerId?: string | null
   onFireIds?: Set<string>
+  /** One-shot animations (R.I.P., revive, fire) anchored on a player */
+  effects?: GameEffect[]
 }
 
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
@@ -78,6 +81,7 @@ export default function GameTable({
   isRoundActive = false,
   dealerId = null,
   onFireIds,
+  effects = [],
 }: GameTableProps) {
   const count = sessionPlayers.length
   const base = sizingFor(count)
@@ -158,6 +162,7 @@ export default function GameTable({
         const isWinner = isRoundActive && rp ? rp.is_winner : false
         const balance = sessionBalances[sp.player_id] ?? 0
         const player = sp.player!
+        const playerEffects = effects.filter(e => e.playerId === sp.player_id)
 
         return (
           <button
@@ -165,7 +170,8 @@ export default function GameTable({
             onClick={() => onPlayerTap?.(sp.player_id)}
             disabled={!onPlayerTap}
             className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform"
-            style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
+            // Lift a seat above its neighbours while an effect plays so it isn't clipped by them.
+            style={{ left: `${pos.left}%`, top: `${pos.top}%`, zIndex: playerEffects.length > 0 ? 40 : undefined }}
           >
             <div className="relative">
               <PlayerAvatar
@@ -185,6 +191,11 @@ export default function GameTable({
                   G
                 </span>
               )}
+              {playerEffects.map(e => (
+                <div key={e.id} className="absolute inset-0 z-30 pointer-events-none">
+                  <PlayerEffect kind={e.kind} size={avatar} />
+                </div>
+              ))}
             </div>
             {/* Name plate — ties avatar, name and balance into one token */}
             <div
