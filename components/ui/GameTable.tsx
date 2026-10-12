@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from './PlayerAvatar'
 import { PlayerEffect, SyringeFlight, type GameEffect } from './GameEffects'
@@ -73,6 +74,61 @@ function activeSizingFor(count: number): ActiveSizing {
   return { avatar: 34, name: 'text-[9px]', bal: 'text-[8px]', minW: 30, maxW: 48 }
 }
 
+// ---------- Active-round layout ----------
+
+/** Reference table width the active sizings above were designed for (phone width). */
+const REF_WIDTH = 343
+/** Part of the scene image that must stay visible (the rest may be cropped). */
+const VIS_X = 0.95 // crop at most 2.5 % per side, so the outer stumps keep room for their tokens
+const VIS_Y = 0.6 // keeps the band around the stumps (≈ 24–84 % of the height)
+const SEAT_CENTER_Y = 0.545 // vertical centre of the stump ring in the image
+const PLATE_H = 36 // name plate height (px at scale 1) below the avatar
+
+type ActiveLayout = {
+  img: { left: number; top: number; w: number; h: number }
+  seats: { left: number; top: number }[] // % of the box
+  scale: number // token scale relative to the phone-sized design
+}
+
+/**
+ * Fits the 2:3 scene into a box of any shape: as large as possible while the
+ * stump ring stays visible, centred on the stumps. Tokens scale with the image;
+ * the vertical fit caps that scale, and a token at the very left/right edge is
+ * nudged inward a little rather than shrinking every token.
+ */
+function layoutActive(
+  W: number,
+  H: number,
+  rawSeats: { left: number; top: number }[],
+  avatar0: number,
+  plate0: number
+): ActiveLayout {
+  const w = Math.min(W / VIS_X, H / (1.5 * VIS_Y))
+  const h = w * 1.5
+  const left = (W - w) / 2
+  let top = H / 2 - SEAT_CENTER_Y * h
+  if (h >= H) top = Math.min(0, Math.max(H - h, top))
+  else top = (H - h) / 2
+  const px = rawSeats.map(r => ({ x: left + (r.left / 100) * w, y: top + (r.top / 100) * h }))
+
+  let scale = Math.min(1.9, w / REF_WIDTH)
+  for (const { y } of px) {
+    scale = Math.min(
+      scale,
+      (y - 2) / (avatar0 / 2), // top edge (avatar)
+      (H - y - 2) / (avatar0 / 2 + PLATE_H) // bottom edge (avatar + name plate)
+    )
+  }
+  scale = Math.max(0.6, scale)
+  const halfW = (Math.max(avatar0, plate0) / 2) * scale
+  const clampX = (x: number) => Math.min(W - halfW - 2, Math.max(halfW + 2, x))
+  return {
+    img: { left, top, w, h },
+    seats: px.map(({ x, y }) => ({ left: (clampX(x) / W) * 100, top: (y / H) * 100 })),
+    scale,
+  }
+}
+
 export default function GameTable({
   sessionPlayers,
   roundPlayers = [],
@@ -83,6 +139,22 @@ export default function GameTable({
   onFireIds,
   effects = [],
 }: GameTableProps) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = boxRef.current
+    if (!isRoundActive || !el) return
+    // Measure right away (ResizeObserver callbacks can be delayed, e.g. in background tabs).
+    const r = el.getBoundingClientRect()
+    if (r.width > 0) setBox({ w: r.width, h: r.height })
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setBox(b => (Math.abs(b.w - width) < 1 && Math.abs(b.h - height) < 1 ? b : { w: width, h: height }))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isRoundActive])
+
   const count = sessionPlayers.length
   const base = sizingFor(count)
   const active = isRoundActive ? activeSizingFor(count) : null
@@ -93,7 +165,7 @@ export default function GameTable({
   const maxW = active?.maxW ?? 104
   const { radius } = base
 
-  const positions = Array.from({ length: count }, (_, i) => {
+  const rawPositions = Array.from({ length: count }, (_, i) => {
     if (isRoundActive) {
       if (count <= ACTIVE_SEATS.length) {
         // Evenly sample the 10 measured seats by index so N players stay spread
@@ -119,6 +191,13 @@ export default function GameTable({
     }
   })
 
+  // Active round: scale the scene + tokens to the measured box (see layoutActive).
+  const layout =
+    isRoundActive && box.w > 0 && active ? layoutActive(box.w, box.h, rawPositions, active.avatar, active.maxW) : null
+  const positions = layout ? layout.seats : rawPositions
+  const tokenScale = layout?.scale ?? 1
+  const avatarPx = Math.round(avatar * tokenScale)
+
   function playerEffectsFor(playerId: string) {
     return effects.filter(e => e.playerId === playerId)
   }
@@ -134,21 +213,47 @@ export default function GameTable({
 
   return (
     <div
-      className={
-        isRoundActive
-          ? 'relative w-full aspect-[2/3] max-h-[64vh] mx-auto'
-          : 'relative w-full max-w-[380px] aspect-square mx-auto'
-      }
+      ref={boxRef}
+      className={isRoundActive ? 'relative w-full h-full' : 'relative w-full max-w-[380px] aspect-square mx-auto'}
     >
       {/* Center — the illustrated table appears only while a round is being played, so
           the setup screen is clearly distinguishable from an active round. */}
       {isRoundActive ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src="/table-active-bg.png"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover rounded-3xl border border-[#E4D9BF] shadow-sm"
-        />
+        <div className="absolute inset-0 rounded-3xl overflow-hidden border border-[#E4D9BF] shadow-sm bg-[#5E7A3A]">
+          {/* Blurred copy fills any space the scene doesn't cover, so the forest seems to continue. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/table-active-bg.png"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover scale-125"
+            style={{ filter: 'blur(18px) saturate(1.1)' }}
+          />
+          {layout && (
+            <div
+              className="absolute"
+              style={{
+                left: layout.img.left,
+                top: layout.img.top,
+                width: layout.img.w,
+                height: layout.img.h,
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent)',
+                maskImage: 'linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent)',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/table-active-bg.png"
+                alt=""
+                className="w-full h-full"
+                style={{
+                  WebkitMaskImage: 'linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)',
+                  maskImage: 'linear-gradient(to right, transparent, #000 4%, #000 96%, transparent)',
+                }}
+              />
+            </div>
+          )}
+        </div>
       ) : (
         <div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full flex flex-col items-center justify-center text-center border-2 border-dashed border-[#D8C9A6] bg-[#F4ECDA]/50"
@@ -163,8 +268,8 @@ export default function GameTable({
         </div>
       )}
 
-      {/* Players */}
-      {sessionPlayers.map((sp, i) => {
+      {/* Players (active round: only once the box is measured, so nothing jumps) */}
+      {(!isRoundActive || layout) && sessionPlayers.map((sp, i) => {
         const pos = positions[i]
         const rp = getRoundPlayer(sp.player_id)
         // A revive animation keeps the player grey until the syringe has injected.
@@ -188,7 +293,7 @@ export default function GameTable({
               <PlayerAvatar
                 name={player.name}
                 avatarUrl={player.avatar_url}
-                size={avatar}
+                size={avatarPx}
                 eliminated={isEliminated}
                 isWinner={isWinner}
                 birthday={player.birthday}
@@ -198,13 +303,14 @@ export default function GameTable({
                 <span
                   className="absolute -top-1 -left-1 bg-[#2E6B3A] text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow ring-2 ring-[#F4ECDA]"
                   title="Geber"
+                  style={{ zoom: tokenScale }}
                 >
                   G
                 </span>
               )}
               {playerEffects.map(e => (
                 <div key={e.id} className="absolute inset-0 z-30 pointer-events-none">
-                  <PlayerEffect kind={e.kind} size={avatar} />
+                  <PlayerEffect kind={e.kind} size={avatarPx} />
                 </div>
               ))}
             </div>
@@ -217,7 +323,7 @@ export default function GameTable({
                     ? 'bg-[#FFFDF7] border-[#2E6B3A]'
                     : 'bg-[#FFFDF7] border-[#E4D9BF]'}
               `}
-              style={{ minWidth: minW, maxWidth: maxW }}
+              style={{ minWidth: minW, maxWidth: maxW, zoom: tokenScale }}
             >
               <span
                 className={`${nameClass} font-semibold leading-tight truncate max-w-full
@@ -242,7 +348,7 @@ export default function GameTable({
         const from = seatOf(e.fromPlayerId)
         const to = seatOf(e.playerId)
         if (!from || !to) return null
-        return <SyringeFlight key={e.id} from={from} to={to} avatar={avatar} />
+        return <SyringeFlight key={e.id} from={from} to={to} avatar={avatarPx} />
       })}
     </div>
   )

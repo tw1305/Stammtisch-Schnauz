@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
 import GameTable from '@/components/ui/GameTable'
+import { NAV_HEIGHT } from '@/components/ui/BottomNav'
 import RoundResultModal from '@/components/ui/RoundResultModal'
 import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndModal'
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
@@ -360,8 +361,17 @@ export default function SpielPage() {
   // Active round
   if (activeRound) {
     return (
-      <div className="flex flex-col min-h-[85vh] max-w-md mx-auto w-full">
-        <div className="flex items-center justify-between px-4 pt-5 pb-2">
+      // Exactly one screen tall (minus the bottom nav): the table takes
+      // all remaining space and nothing ever needs scrolling, on any device.
+      <div
+        className="flex flex-col max-w-3xl mx-auto w-full"
+        style={{
+          height: `calc(100dvh - ${NAV_HEIGHT}px - env(safe-area-inset-bottom))`,
+          // cancels the layout's fixed 6rem nav padding → page is exactly one screen tall
+          marginBottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom) - 6rem)`,
+        }}
+      >
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
           <div className="flex items-center gap-2">
             <span className="font-[family-name:var(--font-display)] text-[#23201A] font-bold text-lg">
               Runde {activeRound.round_number}
@@ -394,7 +404,7 @@ export default function SpielPage() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
+        <div className="flex-1 min-h-0 px-2">
           <GameTable
             sessionPlayers={sessionPlayers}
             roundPlayers={roundPlayers}
@@ -407,7 +417,7 @@ export default function SpielPage() {
           />
         </div>
 
-        <div className="px-4 pb-4 text-center text-[#7C7461] text-sm">
+        <div className="px-4 py-1.5 text-center text-[#7C7461] text-xs shrink-0">
           💡 Spieler antippen zum Ausscheiden / Wiederbeleben
         </div>
 

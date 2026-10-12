@@ -61,6 +61,11 @@ function MoreIcon({ active }: IconProps) {
   )
 }
 
+/** Row height of the nav; with its 1px top border the bar is NAV_HEIGHT tall (+ safe area). */
+const NAV_ROW = 75
+/** Total nav height without the safe area — full-screen views subtract it so nothing hides behind the nav. */
+export const NAV_HEIGHT = NAV_ROW + 1
+
 const tabs = [
   { href: '/spiel', label: 'Spiel', Icon: CardIcon },
   { href: '/spieler', label: 'Spieler', Icon: PeopleIcon },
@@ -82,7 +87,8 @@ export default function BottomNav() {
             <Link
               key={href}
               href={href}
-              className="flex-1 flex flex-col items-center justify-center pt-3 pb-2.5 gap-1.5 min-h-[68px]"
+              className="flex-1 flex flex-col items-center justify-center pt-3 pb-2.5 gap-1.5"
+              style={{ height: NAV_ROW }}
             >
               <div
                 className={`w-12 h-9 rounded-full flex items-center justify-center transition-colors duration-200 ${

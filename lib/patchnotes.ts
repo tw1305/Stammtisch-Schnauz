@@ -28,6 +28,7 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'neu', text: 'Neue Sounds: echte Furzgeräusche beim Ausscheiden (11 Aufnahmen, zufällig ausgewählt, nie zweimal dieselbe hintereinander), eine Feuerexplosion beim Feuer und „I Get Money“ von 50 Cent beim Rundensieg.' },
       { type: 'neu', text: 'Achievement „Burning Man“ 🔥 für die meisten Feuer der Season.' },
       { type: 'neu', text: 'Test-Buttons für Sound & Vibration in den Einstellungen.' },
+      { type: 'verbessert', text: 'Laufende Runde: Die Spielfläche nutzt jetzt den ganzen Bildschirm und die Spielericons sind deutlich größer – auf jedem Gerät ist alles ohne Scrollen sichtbar.' },
       { type: 'verbessert', text: 'Der Feuerring sieht jetzt aus wie echtes Feuer statt wie gezeichnete Flammen.' },
       { type: 'verbessert', text: 'Hot Streak ☄️ zeigt die Länge der Siegesserie (z. B. „4 am Stück“) und wird auch bei kurzen Serien vergeben.' },
       { type: 'behoben', text: 'Der Sound blieb meist stumm, besonders beim Rundensieg – jetzt zuverlässig und lauter. Vibration mit eigenen Mustern, auf dem iPhone ab iOS 18 als Haptik.' },
