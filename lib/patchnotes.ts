@@ -17,26 +17,15 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
-    version: '2.2.0',
-    date: '2026-10-12',
-    title: 'Mehr Spaß, mehr Ordnung',
-    changes: [
-      { type: 'neu', text: 'Neuer Reiter „Mehr“ mit Regeln, Patch Notes und Einstellungen – die Einstellungen sind damit jederzeit erreichbar.' },
-      { type: 'neu', text: 'Patch Notes: alle Updates mit Versionsnummer zum Nachlesen.' },
-      { type: 'neu', text: 'Wiederbelebung: Die Spritze fliegt sichtbar vom Wiederbeleber zum Wiederbelebten. Das Profilbild wird erst nach dem Einstich wieder farbig.' },
-      { type: 'neu', text: 'Ausscheiden: Statt „womp womp“ gibt es jetzt Furzgeräusche – acht Varianten, nie zweimal dieselbe hintereinander.' },
-      { type: 'verbessert', text: 'Feuer klingt jetzt nach echtem Brand: Zündung, Fauchen der Flammen und knisterndes Holz.' },
-      { type: 'verbessert', text: 'Rundensieg klingt wie ein echter Münzregen statt nach Arcade-Gepiepse.' },
-      { type: 'behoben', text: 'Der Feuerring war oben abgeschnitten – die Flammen sind jetzt etwas kleiner und vollständig sichtbar.' },
-    ],
-  },
-  {
     version: '2.1.0',
     date: '2026-10-12',
     title: 'Feuer und Flamme',
     changes: [
-      { type: 'neu', text: 'Reiter „Regeln“: das offizielle Regelwerk mit Abschnitten und Paragraphen – bearbeitbar, mit Stand-Datum.' },
-      { type: 'neu', text: 'Animationen: Grabstein beim Ausscheiden, Spritze beim Wiederbeleben, Feuerexplosion beim Feuer und Münzregen beim Rundensieg. In den Einstellungen abschaltbar.' },
+      { type: 'neu', text: 'Neuer Reiter „Mehr“ mit Regeln, Patch Notes und Einstellungen – die Einstellungen sind damit jederzeit erreichbar.' },
+      { type: 'neu', text: 'Regeln: das offizielle Regelwerk mit Abschnitten und Paragraphen – bearbeitbar, mit Stand-Datum.' },
+      { type: 'neu', text: 'Patch Notes: alle Updates mit Versionsnummer zum Nachlesen.' },
+      { type: 'neu', text: 'Animationen: Grabstein beim Ausscheiden, eine Spritze, die vom Wiederbeleber zum Wiederbelebten fliegt, Feuerexplosion beim Feuer und Münzregen beim Rundensieg. In den Einstellungen abschaltbar.' },
+      { type: 'neu', text: 'Neue Sounds: Furzgeräusche beim Ausscheiden (acht Varianten, nie zweimal dieselbe hintereinander), ein knisternder Brand beim Feuer und klimpernder Münzregen beim Rundensieg.' },
       { type: 'neu', text: 'Achievement „Burning Man“ 🔥 für die meisten Feuer der Season.' },
       { type: 'neu', text: 'Test-Buttons für Sound & Vibration in den Einstellungen.' },
       { type: 'verbessert', text: 'Der Feuerring sieht jetzt aus wie echtes Feuer statt wie gezeichnete Flammen.' },
@@ -63,7 +52,7 @@ export const PATCH_NOTES: PatchNote[] = [
     ],
   },
   {
-    version: '1.4.0',
+    version: '1.3.0',
     date: '2026-08-11',
     title: 'Ab in den Wald',
     changes: [
@@ -76,7 +65,7 @@ export const PATCH_NOTES: PatchNote[] = [
     ],
   },
   {
-    version: '1.3.0',
+    version: '1.2.0',
     date: '2026-07-14',
     title: 'Happy Birthday',
     changes: [
@@ -90,7 +79,7 @@ export const PATCH_NOTES: PatchNote[] = [
     ],
   },
   {
-    version: '1.2.0',
+    version: '1.1.0',
     date: '2026-07-01',
     title: 'Statistik-Feinschliff',
     changes: [
@@ -102,27 +91,17 @@ export const PATCH_NOTES: PatchNote[] = [
     ],
   },
   {
-    version: '1.1.0',
-    date: '2026-06-09',
-    title: 'Profi-Ausstattung',
-    changes: [
-      { type: 'neu', text: '„Rückgängig“ während der Runde und „Runde wieder öffnen“ nach einem Versehen.' },
-      { type: 'neu', text: 'Session-Zusammenfassung, Geber-Markierung am Tisch und frei wählbare Sitzordnung.' },
-      { type: 'neu', text: 'Live-Sync: mehrere Handys sehen dieselbe Runde in Echtzeit.' },
-      { type: 'neu', text: 'Sound & Vibration bei Ausscheiden, Wiederbeleben und Rundensieg.' },
-      { type: 'neu', text: 'Erweiterte Statistik: Win-Rate, Saldo-Verlauf, Achievements und Spielerprofile mit Kopf-an-Kopf.' },
-      { type: 'neu', text: 'Season-Namen lassen sich bearbeiten.' },
-    ],
-  },
-  {
     version: '1.0.0',
     date: '2026-06-08',
     title: 'Der Anfang',
     changes: [
-      { type: 'neu', text: 'Schnauz-Runden digital erfassen: Ausscheiden, Wiederbeleben, Gewinner und Bilanzen.' },
-      { type: 'neu', text: 'Seasons mit Saldovortrag und Auszahlungsübersicht.' },
+      { type: 'neu', text: 'Schnauz-Runden digital erfassen: Ausscheiden, Wiederbeleben, Gewinner und Bilanzen – mit „Rückgängig“ während der Runde und „Runde wieder öffnen“ nach einem Versehen.' },
+      { type: 'neu', text: 'Seasons mit Saldovortrag, Auszahlungsübersicht und bearbeitbarem Namen.' },
       { type: 'neu', text: 'Spielerprofile mit eigenem Profilbild.' },
-      { type: 'neu', text: 'Statistik mit Podium für die Top 3.' },
+      { type: 'neu', text: 'Geber-Markierung am Tisch, frei wählbare Sitzordnung und Session-Zusammenfassung.' },
+      { type: 'neu', text: 'Live-Sync: mehrere Handys sehen dieselbe Runde in Echtzeit.' },
+      { type: 'neu', text: 'Sound & Vibration bei Ausscheiden, Wiederbeleben und Rundensieg.' },
+      { type: 'neu', text: 'Statistik mit Podium, Win-Rate, Saldo-Verlauf, Achievements und Spielerprofilen mit Kopf-an-Kopf.' },
       { type: 'neu', text: 'Als App auf dem Handy installierbar.' },
     ],
   },
