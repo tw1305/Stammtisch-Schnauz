@@ -7,11 +7,16 @@
  *   was saved) therefore never played. We now keep ONE shared context and unlock
  *   it on the first tap anywhere (see initFeedback).
  * - Sounds are synthesized louder and in a frequency range phone speakers can play.
- * - iPhone: the ring/silent switch mutes web audio, and Safari has no Vibration
- *   API — we fall back to the iOS 18+ "switch" haptic trick where possible.
+ * - iPhone: the ring/silent switch mutes web audio.
+ *
+ * Vibration uses the Vibration API, which only Android browsers implement (and only
+ * outside silent / do-not-disturb mode). Safari on iPhone has none — not even for
+ * home-screen apps; the old hidden-switch haptic trick was unreliable and Apple
+ * closed it, so iPhones simply don't vibrate.
  */
 
-const SOUND_KEY = 'schnauz_feedback'
+const SOUND_KEY = 'schnauz_feedback' // historical name: this is the sound toggle
+const VIB_KEY = 'schnauz_vibration'
 const ANIM_KEY = 'schnauz_animations'
 
 function readFlag(key: string): boolean {
@@ -32,8 +37,13 @@ function writeFlag(key: string, on: boolean) {
   }
 }
 
-export const feedbackEnabled = () => readFlag(SOUND_KEY)
-export const setFeedbackEnabled = (on: boolean) => writeFlag(SOUND_KEY, on)
+export const soundEnabled = () => readFlag(SOUND_KEY)
+export const setSoundEnabled = (on: boolean) => writeFlag(SOUND_KEY, on)
+/** Whether this browser can vibrate at all (Android yes, iPhone no). */
+export const vibrationSupported = () =>
+  typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
+export const vibrationEnabled = () => vibrationSupported() && readFlag(VIB_KEY)
+export const setVibrationEnabled = (on: boolean) => writeFlag(VIB_KEY, on)
 export const animationsEnabled = () => readFlag(ANIM_KEY)
 export const setAnimationsEnabled = (on: boolean) => {
   writeFlag(ANIM_KEY, on)
@@ -149,45 +159,13 @@ function hiss(
 
 // ---------- Haptics ----------
 
-let iosSwitch: HTMLLabelElement | null = null
-
-/** iOS 18+ Safari plays a haptic tick when a native switch checkbox toggles. */
-function iosTick() {
+/** Vibrates (on/off pattern in ms) if supported and switched on in the settings. */
+export function vib(pattern: number | number[]) {
+  if (!vibrationEnabled()) return
   try {
-    if (!iosSwitch) {
-      const label = document.createElement('label')
-      label.ariaHidden = 'true'
-      label.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none'
-      const input = document.createElement('input')
-      input.type = 'checkbox'
-      input.setAttribute('switch', '')
-      label.appendChild(input)
-      document.body.appendChild(label)
-      iosSwitch = label
-    }
-    iosSwitch.click()
+    navigator.vibrate(pattern)
   } catch {
-    /* not supported */
-  }
-}
-
-function vib(pattern: number[]) {
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(pattern)
-      return
-    }
-    // No Vibration API (iPhone): one haptic tick per vibration segment.
-    let t = 0
-    pattern.forEach((ms, i) => {
-      if (i % 2 === 0) {
-        if (t === 0) iosTick()
-        else setTimeout(iosTick, t)
-      }
-      t += ms
-    })
-  } catch {
-    /* vibration not available — ignore */
+    /* blocked (e.g. no tap on the page yet) — ignore */
   }
 }
 
@@ -204,7 +182,7 @@ export function initFeedback() {
   initialized = true
   applyAnimationPref()
   const unlock = () => {
-    if (!feedbackEnabled()) return
+    if (!soundEnabled()) return
     const a = audio()
     if (!a) return
     preloadSounds()
@@ -447,8 +425,8 @@ let lastFart = -1
 
 /** Player knocked out: a random fart recording — never the same one twice in a row. */
 export function feedbackEliminate() {
-  if (!feedbackEnabled()) return
   vib([90, 60, 180])
+  if (!soundEnabled()) return
   let i = Math.floor(Math.random() * FART_FILES.length)
   if (i === lastFart) i = (i + 1 + Math.floor(Math.random() * (FART_FILES.length - 1))) % FART_FILES.length
   lastFart = i
@@ -459,8 +437,8 @@ export function feedbackEliminate() {
 
 /** Player revived: injection hiss + rising sparkle arpeggio. */
 export function feedbackRevive() {
-  if (!feedbackEnabled()) return
-  vib([30, 50, 30, 50, 70])
+  vib([60, 60, 60, 60, 140])
+  if (!soundEnabled()) return
   hiss(0, 0.22, { type: 'highpass', from: 3500, to: 6000, gain: 0.22 })
   const notes = [523, 659, 784, 1047, 1319]
   notes.forEach((f, i) => {
@@ -472,8 +450,8 @@ export function feedbackRevive() {
 
 /** Feuer (three aces): fire explosion recording. */
 export function feedbackFire() {
-  if (!feedbackEnabled()) return
-  vib([220, 60, 120, 60, 70, 60, 50])
+  vib([250, 70, 150, 70, 100, 70, 80])
+  if (!soundEnabled()) return
   void playSample(FIRE_FILE, 1).then(src => {
     if (!src) synthFire()
   })
@@ -597,8 +575,8 @@ function clink(start: number, freq: number, gain: number, pan: number) {
 
 /** Round won: 50 Cent – "I Get Money". */
 export function feedbackWinner() {
-  if (!feedbackEnabled()) return
-  vib([40, 40, 40, 40, 40, 40, 40, 40, 260])
+  vib([70, 50, 70, 50, 70, 50, 70, 50, 320])
+  if (!soundEnabled()) return
   // A new win cuts off a still-playing previous one instead of overlapping it.
   try {
     winSource?.stop()

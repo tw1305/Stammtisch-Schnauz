@@ -86,6 +86,8 @@ const VIS_X = 0.95 // crop at most 2.5 % per side, so the outer stumps keep room
 const VIS_Y = 0.6 // keeps the band around the stumps (≈ 31–91 % of the height)
 const SEAT_CENTER_Y = 0.61 // vertical centre of the stump ring in the image
 const PLATE_H = 36 // name plate height (px at scale 1) below the avatar
+/** Largest side of the setup (between rounds) table. */
+const SETUP_MAX = 380
 
 type ActiveLayout = {
   img: { left: number; top: number; w: number; h: number }
@@ -146,7 +148,7 @@ export default function GameTable({
   const [box, setBox] = useState({ w: 0, h: 0 })
   useEffect(() => {
     const el = boxRef.current
-    if (!isRoundActive || !el) return
+    if (!el) return
     // Measure right away (ResizeObserver callbacks can be delayed, e.g. in background tabs).
     const r = el.getBoundingClientRect()
     if (r.width > 0) setBox({ w: r.width, h: r.height })
@@ -198,7 +200,11 @@ export default function GameTable({
   const layout =
     isRoundActive && box.w > 0 && active ? layoutActive(box.w, box.h, rawPositions, active.avatar, active.maxW) : null
   const positions = layout ? layout.seats : rawPositions
-  const tokenScale = layout?.scale ?? 1
+  // Setup view: the round table is the largest square that fits the box, and the
+  // tokens shrink with it (designed for a phone-wide table), so the page around it
+  // never has to scroll.
+  const side = !isRoundActive ? Math.min(box.w, box.h, SETUP_MAX) : 0
+  const tokenScale = layout?.scale ?? (side > 0 ? Math.min(1.1, Math.max(0.5, side / REF_WIDTH)) : 1)
   const avatarPx = Math.round(avatar * tokenScale)
 
   function playerEffectsFor(playerId: string) {
@@ -215,10 +221,16 @@ export default function GameTable({
   }
 
   return (
-    <div
-      ref={boxRef}
-      className={isRoundActive ? 'relative w-full h-full' : 'relative w-full max-w-[380px] aspect-square mx-auto'}
-    >
+    <div ref={boxRef} className="relative w-full h-full">
+      {(isRoundActive || side > 0) && (
+      <div
+        className="absolute"
+        style={
+          isRoundActive
+            ? { inset: 0 }
+            : { left: (box.w - side) / 2, top: (box.h - side) / 2, width: side, height: side }
+        }
+      >
       {/* Center — the illustrated table appears only while a round is being played, so
           the setup screen is clearly distinguishable from an active round. */}
       {isRoundActive ? (
@@ -353,6 +365,8 @@ export default function GameTable({
         if (!from || !to) return null
         return <SyringeFlight key={e.id} from={from} to={to} avatar={avatarPx} />
       })}
+      </div>
+      )}
     </div>
   )
 }

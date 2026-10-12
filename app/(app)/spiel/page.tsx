@@ -287,6 +287,14 @@ export default function SpielPage() {
     await endSessionFlow()
   }
 
+  // Every game screen is exactly one screen tall (minus the bottom nav): the flexible
+  // part (player grid / table) shrinks so all controls stay visible on any device.
+  // The negative margin cancels the layout's fixed 6rem nav padding.
+  const screenStyle = {
+    height: `calc(100dvh - ${NAV_HEIGHT + (testMode ? TEST_BANNER_HEIGHT : 0)}px - env(safe-area-inset-bottom))`,
+    marginBottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom) - 6rem)`,
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
@@ -298,9 +306,9 @@ export default function SpielPage() {
   // No active session → player picker
   if (!session) {
     return (
-      <div className="flex flex-col max-w-md mx-auto w-full min-h-[85vh] px-4 pt-8 pb-6">
-        <div className="text-center mb-8">
-          <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold text-[#23201A] tracking-tight">
+      <div className="flex flex-col max-w-md mx-auto w-full px-4 pt-5 pb-3 overflow-y-auto" style={screenStyle}>
+        <div className="text-center mb-4 shrink-0">
+          <h1 className="font-[family-name:var(--font-display)] text-[clamp(1.75rem,8vw,2.25rem)] font-extrabold text-[#23201A] tracking-tight leading-tight">
             Stammtisch <span className="text-[#2E6B3A]">Schnauz</span>
           </h1>
           {activeSeason ? (
@@ -312,37 +320,15 @@ export default function SpielPage() {
 
         {activeSeason && (
           <>
-            <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">
+            <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-2 font-medium shrink-0">
               Wer spielt mit? ({pickedIds.size}/9{pickedIds.size >= 9 ? ' · Maximum erreicht' : ''})
             </p>
-            <div className="grid grid-cols-3 gap-2.5 flex-1 content-start">
-              {allPlayers.map(p => {
-                const picked = pickedIds.has(p.id)
-                const disabled = !picked && pickedIds.size >= 9
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => togglePick(p.id)}
-                    disabled={disabled}
-                    className={`flex flex-col items-center gap-2 rounded-2xl py-4 border transition-all ${
-                      picked
-                        ? 'border-[#2E6B3A] bg-[#2E6B3A]/10'
-                        : disabled
-                          ? 'border-[#E4D9BF] bg-[#FBF6EA] opacity-30'
-                          : 'border-[#E4D9BF] bg-[#FBF6EA] opacity-60'
-                    }`}
-                  >
-                    <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={56} />
-                    <span className="text-[#23201A] text-xs font-medium truncate max-w-[80px]">{p.name}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <PlayerPickGrid players={allPlayers} pickedIds={pickedIds} onToggle={togglePick} />
 
             <button
               onClick={handleStartSession}
               disabled={pickedIds.size < 2}
-              className="mt-6 w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-40 text-white font-semibold rounded-2xl py-4 text-base transition-colors"
+              className="mt-3 shrink-0 w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-40 text-white font-semibold rounded-2xl py-4 text-base transition-colors"
             >
               ▶ Session starten
             </button>
@@ -352,7 +338,7 @@ export default function SpielPage() {
         {!activeSeason && (
           <button
             onClick={() => router.push('/seasons')}
-            className="mt-6 w-full bg-[#2E6B3A] text-white font-semibold rounded-2xl py-4 transition-colors"
+            className="mt-6 shrink-0 w-full bg-[#2E6B3A] text-white font-semibold rounded-2xl py-4 transition-colors"
           >
             Zu den Seasons
           </button>
@@ -372,16 +358,8 @@ export default function SpielPage() {
   // Active round
   if (activeRound) {
     return (
-      // Exactly one screen tall (minus the bottom nav): the table takes
-      // all remaining space and nothing ever needs scrolling, on any device.
-      <div
-        className="flex flex-col max-w-3xl mx-auto w-full"
-        style={{
-          height: `calc(100dvh - ${NAV_HEIGHT + (testMode ? TEST_BANNER_HEIGHT : 0)}px - env(safe-area-inset-bottom))`,
-          // cancels the layout's fixed 6rem nav padding → page is exactly one screen tall
-          marginBottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom) - 6rem)`,
-        }}
-      >
+      // The table takes all remaining space; nothing ever needs scrolling.
+      <div className="flex flex-col max-w-3xl mx-auto w-full" style={screenStyle}>
         <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">
           <div className="flex items-center gap-2">
             <span className="font-[family-name:var(--font-display)] text-[#23201A] font-bold text-lg">
@@ -474,22 +452,31 @@ export default function SpielPage() {
 
   // Between rounds
   return (
-    <div className="flex flex-col max-w-md mx-auto w-full">
+    <div className="flex flex-col max-w-md mx-auto w-full overflow-y-auto" style={screenStyle}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-5 pb-2">
-        <span className="font-[family-name:var(--font-display)] text-[#23201A] font-bold text-lg">
+      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1 shrink-0">
+        <span className="font-[family-name:var(--font-display)] text-[#23201A] font-bold text-lg truncate min-w-0">
           {activeSeason?.name ?? 'Session'}
         </span>
-        <button
-          onClick={() => router.push('/einstellungen')}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#7C7461] text-lg transition-colors"
-        >
-          ⚙
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setShowPlayerManager(true)}
+            className="h-9 px-3 flex items-center gap-1 rounded-full text-sm font-medium transition-colors bg-[#FBF6EA] border border-[#E4D9BF] text-[#23201A] hover:border-[#2E6B3A]/50"
+          >
+            👥 Spieler & Sitzordnung
+          </button>
+          <button
+            onClick={() => router.push('/einstellungen')}
+            aria-label="Einstellungen"
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#7C7461] text-lg transition-colors"
+          >
+            ⚙
+          </button>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="flex justify-center px-4 py-2">
+      {/* Table — takes whatever height is left and shrinks to fit */}
+      <div className="flex-1 min-h-[180px] px-4 py-3">
         <GameTable
           sessionPlayers={sessionPlayers}
           sessionBalances={sessionBalances}
@@ -499,24 +486,16 @@ export default function SpielPage() {
         />
       </div>
 
-      {/* Dealer + player management */}
-      <div className="px-4 mb-4 space-y-2">
-        <div className="flex items-center justify-center gap-1.5 text-sm text-[#7C7461]">
-          <span>🃏 Geber:</span>
-          <span className="font-semibold text-[#23201A]">
-            {sessionPlayers.find(sp => sp.player_id === dealerId)?.player?.name ?? '—'}
-          </span>
-        </div>
-        <button
-          onClick={() => setShowPlayerManager(true)}
-          className="w-full bg-[#FBF6EA] border border-[#E4D9BF] text-[#23201A] rounded-2xl py-3 text-sm font-medium hover:border-[#2E6B3A]/50 transition-colors"
-        >
-          👥 Spieler & Sitzordnung
-        </button>
+      {/* Dealer */}
+      <div className="px-4 pb-2 flex items-center justify-center gap-1.5 text-sm text-[#7C7461] shrink-0">
+        <span>🃏 Geber:</span>
+        <span className="font-semibold text-[#23201A]">
+          {sessionPlayers.find(sp => sp.player_id === dealerId)?.player?.name ?? '—'}
+        </span>
       </div>
 
       {/* Stake selection */}
-      <div className="px-4 mb-4">
+      <div className="px-4 mb-3 shrink-0">
         <p className="text-[#7C7461] text-xs mb-2 font-medium uppercase tracking-wider">Einsatz wählen</p>
         <div className="grid grid-cols-4 gap-2">
           {STAKE_OPTIONS.map(opt => {
@@ -563,17 +542,17 @@ export default function SpielPage() {
       </div>
 
       {/* Actions */}
-      <div className="px-4 space-y-2 pb-4">
+      <div className="px-4 pb-3 flex gap-2 shrink-0">
         <button
           onClick={handleStartRound}
           disabled={sessionPlayers.length < 2 || startingRound}
-          className="w-full bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-2xl py-4 text-base transition-colors"
+          className="flex-[3] min-w-0 min-h-14 bg-[#2E6B3A] hover:bg-[#3A8049] disabled:opacity-50 text-white font-semibold rounded-2xl px-3 py-2 text-[15px] leading-tight transition-colors"
         >
-          {startingRound ? 'Runde wird gestartet…' : `▶ Neue Runde starten · ${effectiveStake} €`}
+          {startingRound ? 'Wird gestartet…' : `▶ Neue Runde · ${effectiveStake} €`}
         </button>
         <button
           onClick={handleEndSession}
-          className="w-full bg-[#B85C1E] hover:bg-[#A04F18] text-white font-semibold rounded-2xl py-3 text-sm transition-colors"
+          className="flex-[2] min-w-0 min-h-14 bg-[#B85C1E] hover:bg-[#A04F18] text-white font-semibold rounded-2xl px-3 py-2 text-sm leading-tight transition-colors"
         >
           🏁 Session beenden
         </button>
@@ -616,6 +595,90 @@ export default function SpielPage() {
           seasonSummary={endData.season}
           onClose={() => setEndData(null)}
         />
+      )}
+    </div>
+  )
+}
+
+const PICK_GAP = 8
+/** Name line + gap + vertical padding of a picker tile, besides the avatar. */
+const PICK_CHROME = 40
+
+/**
+ * Session player picker that always fits its box: picks the column count that
+ * gives the biggest avatars while every player stays visible without scrolling.
+ */
+function PlayerPickGrid({
+  players,
+  pickedIds,
+  onToggle,
+}: {
+  players: Player[]
+  pickedIds: Set<string>
+  onToggle: (id: string) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setBox({ w: r.width, h: r.height })
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setBox(b => (Math.abs(b.w - width) < 1 && Math.abs(b.h - height) < 1 ? b : { w: width, h: height }))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const n = Math.max(1, players.length)
+  let cols = 3
+  let avatar = 0
+  for (const c of [3, 4, 5, 6]) {
+    const rows = Math.ceil(n / c)
+    const cellW = (box.w - PICK_GAP * (c - 1)) / c
+    const cellH = (box.h - PICK_GAP * (rows - 1)) / rows
+    const a = Math.floor(Math.min(64, cellW - 16, cellH - PICK_CHROME))
+    if (a > avatar) {
+      avatar = a
+      cols = c
+    }
+  }
+  avatar = Math.max(28, avatar)
+  const rows = Math.ceil(n / cols)
+  // Tiles stretch to fill the height, but never get taller than a comfortable tile.
+  const tileH = Math.min(avatar + PICK_CHROME + 24, (box.h - PICK_GAP * (rows - 1)) / rows)
+
+  return (
+    <div ref={ref} className="flex-1 min-h-[120px]">
+      {box.w > 0 && (
+        <div
+          className="grid content-start"
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: Math.max(tileH, avatar + PICK_CHROME), gap: PICK_GAP }}
+        >
+          {players.map(p => {
+            const picked = pickedIds.has(p.id)
+            const disabled = !picked && pickedIds.size >= 9
+            return (
+              <button
+                key={p.id}
+                onClick={() => onToggle(p.id)}
+                disabled={disabled}
+                className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-1 border transition-all ${
+                  picked
+                    ? 'border-[#2E6B3A] bg-[#2E6B3A]/10'
+                    : disabled
+                      ? 'border-[#E4D9BF] bg-[#FBF6EA] opacity-30'
+                      : 'border-[#E4D9BF] bg-[#FBF6EA] opacity-60'
+                }`}
+              >
+                <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={avatar} />
+                <span className="text-[#23201A] text-xs font-medium truncate max-w-full">{p.name}</span>
+              </button>
+            )
+          })}
+        </div>
       )}
     </div>
   )

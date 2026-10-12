@@ -6,8 +6,12 @@ import { isTestMode, setTestMode } from '@/lib/supabase/client'
 import { resetTestData } from '@/lib/supabase/testdb'
 import { useRouter } from 'next/navigation'
 import {
-  feedbackEnabled,
-  setFeedbackEnabled,
+  soundEnabled,
+  vibrationSupported,
+  vibrationEnabled,
+  setVibrationEnabled,
+  vib,
+  setSoundEnabled,
   animationsEnabled,
   setAnimationsEnabled,
   initFeedback,
@@ -31,7 +35,9 @@ export default function EinstellungenPage() {
   const [defaultStake, setDefaultStake] = useState(3)
   const [stakeInput, setStakeInput] = useState('3')
   const [saveMsg, setSaveMsg] = useState('')
-  const [feedbackOn, setFeedbackOn] = useState(true)
+  const [soundOn, setSoundOn] = useState(true)
+  const [vibSupported, setVibSupported] = useState(true)
+  const [vibOn, setVibOn] = useState(true)
   const [animOn, setAnimOn] = useState(true)
   const [testOn, setTestOn] = useState(false)
 
@@ -41,7 +47,9 @@ export default function EinstellungenPage() {
       setDefaultStake(parseInt(saved))
       setStakeInput(saved)
     }
-    setFeedbackOn(feedbackEnabled())
+    setSoundOn(soundEnabled())
+    setVibSupported(vibrationSupported())
+    setVibOn(vibrationEnabled())
     setAnimOn(animationsEnabled())
     setTestOn(isTestMode())
     initFeedback()
@@ -66,10 +74,17 @@ export default function EinstellungenPage() {
     setAnimationsEnabled(next)
   }
 
-  function toggleFeedback() {
-    const next = !feedbackOn
-    setFeedbackOn(next)
-    setFeedbackEnabled(next)
+  function toggleVibration() {
+    const next = !vibOn
+    setVibOn(next)
+    setVibrationEnabled(next)
+    if (next) vib(200) // instant proof it works
+  }
+
+  function toggleSound() {
+    const next = !soundOn
+    setSoundOn(next)
+    setSoundEnabled(next)
   }
 
   function saveStake() {
@@ -127,17 +142,17 @@ export default function EinstellungenPage() {
           </p>
         </div>
 
-        {/* Sound & vibration */}
+        {/* Sound */}
         <div className="bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl overflow-hidden">
           <Toggle
-            title="Sound & Vibration"
+            title="Sound"
             desc="Beim Ausscheiden, Wiederbeleben, Feuer & Rundensieg"
-            on={feedbackOn}
-            onToggle={toggleFeedback}
+            on={soundOn}
+            onToggle={toggleSound}
           />
-          {feedbackOn && (
+          {(soundOn || vibOn) && (
             <div className="px-4 pb-3.5">
-              <p className="text-[#7C7461] text-[11px] mb-2">Zum Testen antippen:</p>
+              <p className="text-[#7C7461] text-[11px] mb-2">Zum Testen antippen (Sound und Vibration):</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {SOUND_TESTS.map(t => (
                   <button
@@ -150,8 +165,35 @@ export default function EinstellungenPage() {
                 ))}
               </div>
               <p className="text-[#7C7461] text-[11px] mt-2 leading-snug">
-                iPhone: Ton nur, wenn der Stumm-Schalter aus ist. Vibration gibt es dort erst ab iOS 18 und nur
-                als kurzes Antippen.
+                iPhone: Ton nur, wenn der Stumm-Schalter aus ist.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Vibration — only Android browsers support it */}
+        <div className="bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl overflow-hidden">
+          {vibSupported ? (
+            <>
+              <Toggle
+                title="Vibration"
+                desc="Beim Ausscheiden, Wiederbeleben, Feuer & Rundensieg"
+                on={vibOn}
+                onToggle={toggleVibration}
+              />
+              {vibOn && (
+                <p className="px-4 pb-3.5 -mt-1 text-[#7C7461] text-[11px] leading-snug">
+                  Spürst du nichts? Stumm- und Nicht-stören-Modus ausschalten und in den Android-Einstellungen
+                  „Vibration &amp; Haptik“ aktivieren.
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="px-4 py-4">
+              <p className="text-[#7C7461] font-medium">Vibration</p>
+              <p className="text-[#7C7461] text-xs mt-0.5 leading-snug">
+                Auf diesem Gerät nicht verfügbar: Apple erlaubt Web-Apps auf dem iPhone keine Vibration. Auf
+                Android-Handys funktioniert sie.
               </p>
             </div>
           )}
