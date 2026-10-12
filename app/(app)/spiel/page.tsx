@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
 import GameTable from '@/components/ui/GameTable'
 import { NAV_HEIGHT } from '@/components/ui/BottomNav'
+import { TEST_BANNER_HEIGHT, useTestMode } from '@/components/ui/TestModeBanner'
 import RoundResultModal from '@/components/ui/RoundResultModal'
 import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndModal'
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
@@ -82,6 +83,7 @@ export default function SpielPage() {
   const [effects, setEffects] = useState<GameEffect[]>([])
   const [coinRain, setCoinRain] = useState(false)
   const effectId = useRef(0)
+  const testMode = useTestMode()
 
   useEffect(() => {
     loadMeta()
@@ -366,7 +368,7 @@ export default function SpielPage() {
       <div
         className="flex flex-col max-w-3xl mx-auto w-full"
         style={{
-          height: `calc(100dvh - ${NAV_HEIGHT}px - env(safe-area-inset-bottom))`,
+          height: `calc(100dvh - ${NAV_HEIGHT + (testMode ? TEST_BANNER_HEIGHT : 0)}px - env(safe-area-inset-bottom))`,
           // cancels the layout's fixed 6rem nav padding → page is exactly one screen tall
           marginBottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom) - 6rem)`,
         }}

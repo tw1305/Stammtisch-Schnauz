@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { isTestMode, setTestMode } from '@/lib/supabase/client'
+import { resetTestData } from '@/lib/supabase/testdb'
 import { useRouter } from 'next/navigation'
 import {
   feedbackEnabled,
@@ -31,6 +33,7 @@ export default function EinstellungenPage() {
   const [saveMsg, setSaveMsg] = useState('')
   const [feedbackOn, setFeedbackOn] = useState(true)
   const [animOn, setAnimOn] = useState(true)
+  const [testOn, setTestOn] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem(STAKE_KEY)
@@ -40,8 +43,22 @@ export default function EinstellungenPage() {
     }
     setFeedbackOn(feedbackEnabled())
     setAnimOn(animationsEnabled())
+    setTestOn(isTestMode())
     initFeedback()
   }, [])
+
+  function toggleTestMode() {
+    const msg = testOn
+      ? 'Testmodus beenden? Danach wird wieder mit den echten Daten gespielt.'
+      : 'Testmodus starten? Seasons, Sessions und Runden laufen dann nur zum Ausprobieren auf diesem Gerät – echte Daten und Statistiken bleiben unberührt.'
+    if (confirm(msg)) setTestMode(!testOn) // reloads the app
+  }
+
+  function resetTest() {
+    if (!confirm('Alle Testdaten (Test-Seasons, -Sessions und -Runden) löschen?')) return
+    resetTestData()
+    window.location.reload()
+  }
 
   function toggleAnimations() {
     const next = !animOn
@@ -148,6 +165,30 @@ export default function EinstellungenPage() {
             on={animOn}
             onToggle={toggleAnimations}
           />
+        </div>
+
+        {/* Test mode */}
+        <div className={`rounded-2xl overflow-hidden border ${testOn ? 'bg-[#5B3F99]/10 border-[#5B3F99]/50' : 'bg-[#FBF6EA] border-[#E4D9BF]'}`}>
+          <Toggle
+            title="🧪 Testmodus"
+            desc="Seasons, Sessions und Runden nur zum Ausprobieren – nichts davon landet in den echten Daten"
+            on={testOn}
+            onToggle={toggleTestMode}
+          />
+          {testOn && (
+            <div className="px-4 pb-3.5 space-y-2">
+              <p className="text-[#5E5544] text-[11px] leading-snug">
+                Testdaten liegen nur auf diesem Gerät. Statistik und Seasons zeigen im Testmodus nur Testdaten.
+                Spieler und Regeln sind weiterhin die echten.
+              </p>
+              <button
+                onClick={resetTest}
+                className="w-full h-10 rounded-xl bg-[#FFFDF7] border border-[#E4D9BF] text-[#C8443B] text-sm font-medium"
+              >
+                Testdaten zurücksetzen
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Link to player management */}
