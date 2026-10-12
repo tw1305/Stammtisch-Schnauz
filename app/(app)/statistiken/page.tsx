@@ -137,7 +137,7 @@ export default function StatistikenPage() {
             <KeyFigure label="Sessions" value={scope.sessions} />
             <KeyFigure label="Runden" value={scope.rounds} />
             <KeyFigure label="Ø Einsatz" value={`${scope.avg_stake.toLocaleString('de-DE')} €`} />
-            <KeyFigure label="Ø Spieler" value={scope.avg_players.toLocaleString('de-DE')} icon="👥" />
+            <KeyFigure label="Ø Spieler" value={scope.avg_players.toLocaleString('de-DE')} />
             <KeyFigure label="Feuer" value={scope.fires} icon="🔥" />
           </div>
         )}
