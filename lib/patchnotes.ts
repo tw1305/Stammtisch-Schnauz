@@ -25,7 +25,7 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'neu', text: 'Regeln: das offizielle Regelwerk mit Abschnitten und Paragraphen – bearbeitbar, mit Stand-Datum.' },
       { type: 'neu', text: 'Patch Notes: alle Updates mit Versionsnummer zum Nachlesen.' },
       { type: 'neu', text: 'Animationen: Grabstein beim Ausscheiden, eine Spritze, die vom Wiederbeleber zum Wiederbelebten fliegt, Feuerexplosion beim Feuer und Münzregen beim Rundensieg. In den Einstellungen abschaltbar.' },
-      { type: 'neu', text: 'Neue Sounds: Furzgeräusche beim Ausscheiden (acht Varianten, nie zweimal dieselbe hintereinander), ein knisternder Brand beim Feuer und klimpernder Münzregen beim Rundensieg.' },
+      { type: 'neu', text: 'Neue Sounds: echte Furzgeräusche beim Ausscheiden (11 Aufnahmen, zufällig ausgewählt, nie zweimal dieselbe hintereinander), eine Feuerexplosion beim Feuer und „I Get Money“ von 50 Cent beim Rundensieg.' },
       { type: 'neu', text: 'Achievement „Burning Man“ 🔥 für die meisten Feuer der Season.' },
       { type: 'neu', text: 'Test-Buttons für Sound & Vibration in den Einstellungen.' },
       { type: 'verbessert', text: 'Der Feuerring sieht jetzt aus wie echtes Feuer statt wie gezeichnete Flammen.' },

@@ -198,6 +198,7 @@ export function initFeedback() {
     if (!feedbackEnabled()) return
     const a = audio()
     if (!a) return
+    preloadSounds()
     // Play an inaudible blip — required by older iOS to fully unlock audio.
     try {
       const src = a.ctx.createBufferSource()
@@ -211,6 +212,73 @@ export function initFeedback() {
   for (const ev of ['touchend', 'click', 'keydown']) {
     window.addEventListener(ev, unlock, { capture: true, passive: true })
   }
+}
+
+// ---------- Recorded sounds (public/sounds) ----------
+
+/** Fart recordings (freesound.org), converted to small mono WAVs; picked at random. */
+const FART_FILES = [
+  '/sounds/fart-01.wav', '/sounds/fart-02.wav', '/sounds/fart-03.wav', '/sounds/fart-04.wav',
+  '/sounds/fart-05.wav', '/sounds/fart-06.wav', '/sounds/fart-07.wav', '/sounds/fart-08.wav',
+  '/sounds/fart-09.wav', '/sounds/fart-10.mp3', '/sounds/fart-11.mp3',
+]
+/** Fire explosion (freesound #186932 by readeonly), trimmed to start at 1.1 s. */
+const FIRE_FILE = '/sounds/fire.wav'
+/** Round won: 50 Cent – "I Get Money" (trimmed clip). */
+const WIN_FILE = '/sounds/win.mp3'
+
+const sampleCache = new Map<string, Promise<AudioBuffer | null>>()
+let sampleOut: GainNode | null = null
+let winSource: AudioBufferSourceNode | null = null
+let preloaded = false
+
+function loadSample(url: string): Promise<AudioBuffer | null> {
+  const a = audio()
+  if (!a) return Promise.resolve(null)
+  let p = sampleCache.get(url)
+  if (!p) {
+    p = fetch(url)
+      .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      // Callback form: older iOS Safari has no promise-based decodeAudioData.
+      .then(data => new Promise<AudioBuffer>((res, rej) => a.ctx.decodeAudioData(data, res, rej)))
+      .catch(() => {
+        sampleCache.delete(url) // allow a retry later (e.g. after being offline)
+        return null
+      })
+    sampleCache.set(url, p)
+  }
+  return p
+}
+
+/** Fetches and decodes all recorded sounds once, so they play instantly later. */
+function preloadSounds() {
+  if (preloaded) return
+  preloaded = true
+  for (const url of [...FART_FILES, FIRE_FILE, WIN_FILE]) void loadSample(url)
+}
+
+/**
+ * Plays a recorded sound. Resolves to the playing source, or null if the file
+ * couldn't be loaded — callers then fall back to the synthesized sound.
+ * Recordings bypass the compressor (they are already mastered).
+ */
+async function playSample(url: string, gain = 0.9): Promise<AudioBufferSourceNode | null> {
+  const a = audio()
+  if (!a) return null
+  const buf = await loadSample(url)
+  if (!buf) return null
+  if (!sampleOut) {
+    sampleOut = a.ctx.createGain()
+    sampleOut.connect(a.ctx.destination)
+  }
+  const src = a.ctx.createBufferSource()
+  src.buffer = buf
+  const g = a.ctx.createGain()
+  g.gain.value = gain
+  src.connect(g)
+  g.connect(sampleOut)
+  src.start()
+  return src
 }
 
 // ---------- Sound building blocks ----------
@@ -368,14 +436,16 @@ let lastFart = -1
 
 // ---------- Game sounds ----------
 
-/** Player knocked out: a fart — a different one than last time. */
+/** Player knocked out: a random fart recording — never the same one twice in a row. */
 export function feedbackEliminate() {
   if (!feedbackEnabled()) return
   vib([90, 60, 180])
-  let i = Math.floor(Math.random() * FARTS.length)
-  if (i === lastFart) i = (i + 1 + Math.floor(Math.random() * (FARTS.length - 1))) % FARTS.length
+  let i = Math.floor(Math.random() * FART_FILES.length)
+  if (i === lastFart) i = (i + 1 + Math.floor(Math.random() * (FART_FILES.length - 1))) % FART_FILES.length
   lastFart = i
-  FARTS[i]()
+  void playSample(FART_FILES[i], 1).then(src => {
+    if (!src) FARTS[Math.floor(Math.random() * FARTS.length)]() // offline fallback: synthesized fart
+  })
 }
 
 /** Player revived: injection hiss + rising sparkle arpeggio. */
@@ -391,13 +461,20 @@ export function feedbackRevive() {
   tone(2093, 0.6, 0.6, { type: 'sine', gain: 0.08 })
 }
 
-/** Feuer (three aces): ignition whoosh, roaring blaze and crackling embers. */
+/** Feuer (three aces): fire explosion recording. */
 export function feedbackFire() {
   if (!feedbackEnabled()) return
+  vib([220, 60, 120, 60, 70, 60, 50])
+  void playSample(FIRE_FILE, 1).then(src => {
+    if (!src) synthFire()
+  })
+}
+
+/** Fallback when the recording can't be loaded: ignition whoosh, roaring blaze, crackling embers. */
+function synthFire() {
   const a = audio()
   if (!a) return
   const { ctx: c, out } = a
-  vib([220, 60, 120, 60, 70, 60, 50])
   const t0 = c.currentTime
 
   // "Wumm" of the ignition
@@ -509,10 +586,25 @@ function clink(start: number, freq: number, gain: number, pan: number) {
   n.stop(t0 + 0.02)
 }
 
-/** Round won: a real shower of coins raining down, clinking and bouncing. */
+/** Round won: 50 Cent – "I Get Money". */
 export function feedbackWinner() {
   if (!feedbackEnabled()) return
   vib([40, 40, 40, 40, 40, 40, 40, 40, 260])
+  // A new win cuts off a still-playing previous one instead of overlapping it.
+  try {
+    winSource?.stop()
+  } catch {
+    /* already stopped */
+  }
+  winSource = null
+  void playSample(WIN_FILE, 0.85).then(src => {
+    if (src) winSource = src
+    else synthCoins()
+  })
+}
+
+/** Fallback when the recording can't be loaded: a shower of clinking, bouncing coins. */
+function synthCoins() {
   // Jingling bed: the pile of coins shimmering
   hiss(0.05, 2.2, { type: 'bandpass', from: 7000, to: 5500, gain: 0.09, q: 1.2 })
   for (let i = 0; i < 48; i++) {
