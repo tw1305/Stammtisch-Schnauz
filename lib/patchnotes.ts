@@ -21,6 +21,7 @@ export const PATCH_NOTES: PatchNote[] = [
     date: '2026-10-12',
     title: 'Feuer und Flamme',
     changes: [
+      { type: 'neu', text: 'Neuer Spieltisch für Season 4: herbstlicher Wald zur Golden Hour mit fallendem Laub, Bier auf dem Tisch und leuchtendem „Season 4“-Schild.' },
       { type: 'neu', text: 'Neuer Reiter „Mehr“ mit Regeln, Patch Notes und Einstellungen – die Einstellungen sind damit jederzeit erreichbar.' },
       { type: 'neu', text: 'Regeln: das offizielle Regelwerk mit Abschnitten und Paragraphen – bearbeitbar, mit Stand-Datum.' },
       { type: 'neu', text: 'Patch Notes: alle Updates mit Versionsnummer zum Nachlesen.' },

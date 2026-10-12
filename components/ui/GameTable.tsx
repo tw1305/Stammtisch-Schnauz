@@ -30,29 +30,31 @@ function sizingFor(count: number): Sizing {
   return { avatar: 56, name: 'text-[11px]', bal: 'text-[10px]', radius: 41 }
 }
 
-// Exact seat centers (% of the container) measured directly off the 10 tree-stump
-// seats drawn in table-active-bg.png (1024×1536, native 2:3 — no cropping needed).
-// Ordered clockwise starting at the top stump. For fewer players we sample this
-// list evenly by index so the used seats stay spread around the table instead of
-// clustering on one side.
+/** Scene shown while a round is played (Season 4: autumn forest at golden hour). */
+const ACTIVE_BG = '/table-season4.webp'
+
+// Exact seat centers (% of the image) measured off the 10 tree-stump tops in
+// table-season4.webp (1024×1536, native 2:3). Ordered clockwise starting at the
+// back-centre stump. For fewer players we sample this list evenly by index so the
+// used seats stay spread around the table instead of clustering on one side.
 const ACTIVE_SEATS: { left: number; top: number }[] = [
-  { left: 48.8, top: 38.4 }, // back, top-center
-  { left: 67.9, top: 40.2 }, // back-right
-  { left: 84.0, top: 47.5 }, // right
-  { left: 86.4, top: 57.9 }, // right, lower
-  { left: 71.3, top: 67.9 }, // front-right
-  { left: 46.2, top: 70.8 }, // front, bottom-center
-  { left: 22.3, top: 68.2 }, // front-left
-  { left: 12.2, top: 56.6 }, // left, lower
-  { left: 15.9, top: 46.2 }, // left
-  { left: 31.7, top: 39.9 }, // back-left
+  { left: 50.5, top: 42.0 }, // back, top-center
+  { left: 71.1, top: 44.9 }, // back-right
+  { left: 85.9, top: 53.1 }, // right
+  { left: 86.9, top: 65.8 }, // right, lower
+  { left: 72.3, top: 76.2 }, // front-right
+  { left: 48.8, top: 79.8 }, // front, bottom-center
+  { left: 26.4, top: 74.9 }, // front-left
+  { left: 12.7, top: 64.8 }, // left, lower
+  { left: 14.4, top: 52.7 }, // left
+  { left: 29.1, top: 45.2 }, // back-left
 ]
 
 // Fallback for the rare session with more players than drawn seats (11+): grows an
 // ellipse (fitted to the same 10 seats) outward into the surrounding clearing,
 // clamped so nobody drifts into the treeline or off the image.
-const ACTIVE_TABLE = { cx: 48.7, cy: 53.4, rx: 37.3, ry: 16.9 }
-const ACTIVE_BOUNDS = { left: [4, 96] as [number, number], top: [36, 74] as [number, number] }
+const ACTIVE_TABLE = { cx: 49.8, cy: 60.9, rx: 37.1, ry: 18.9 }
+const ACTIVE_BOUNDS = { left: [4, 96] as [number, number], top: [40, 86] as [number, number] }
 
 function activeScaleFor(count: number): number {
   if (count <= ACTIVE_SEATS.length) return 1
@@ -80,8 +82,8 @@ function activeSizingFor(count: number): ActiveSizing {
 const REF_WIDTH = 343
 /** Part of the scene image that must stay visible (the rest may be cropped). */
 const VIS_X = 0.95 // crop at most 2.5 % per side, so the outer stumps keep room for their tokens
-const VIS_Y = 0.6 // keeps the band around the stumps (≈ 24–84 % of the height)
-const SEAT_CENTER_Y = 0.545 // vertical centre of the stump ring in the image
+const VIS_Y = 0.6 // keeps the band around the stumps (≈ 31–91 % of the height)
+const SEAT_CENTER_Y = 0.61 // vertical centre of the stump ring in the image
 const PLATE_H = 36 // name plate height (px at scale 1) below the avatar
 
 type ActiveLayout = {
@@ -223,7 +225,7 @@ export default function GameTable({
           {/* Blurred copy fills any space the scene doesn't cover, so the forest seems to continue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/table-active-bg.png"
+            src={ACTIVE_BG}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover scale-125"
@@ -243,7 +245,7 @@ export default function GameTable({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/table-active-bg.png"
+                src={ACTIVE_BG}
                 alt=""
                 className="w-full h-full"
                 style={{
