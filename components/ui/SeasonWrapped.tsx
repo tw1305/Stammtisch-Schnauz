@@ -46,6 +46,7 @@ const BG = {
   violet: 'radial-gradient(120% 80% at 50% 0%, #5B3F99 0%, #2C1E4D 55%, #120B21 100%)',
   wood: 'radial-gradient(120% 80% at 50% 0%, #7A5230 0%, #3B2716 55%, #1A1109 100%)',
   wine: 'radial-gradient(120% 80% at 50% 0%, #6B1F2A 0%, #351017 55%, #16070A 100%)',
+  steel: 'radial-gradient(120% 80% at 50% 0%, #46546B 0%, #212937 55%, #0D1117 100%)',
 }
 
 const GHOSTS: GhostWave[] = [
@@ -109,18 +110,24 @@ function CountUp({ value, decimals = 0, format, delay = 0.25 }: { value: number;
   return <>{format ? format(n) : n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</>
 }
 
-function Rise({ delay = 0, className = '', children }: { delay?: number; className?: string; children: ReactNode }) {
+function Rise({ delay = 0, className = '', style, children }: { delay?: number; className?: string; style?: React.CSSProperties; children: ReactNode }) {
   return (
-    <div className={`sw-rise ${className}`} style={{ animationDelay: `${delay}s` }}>
+    <div className={`sw-rise ${className}`} style={{ ...style, animationDelay: `${delay}s` }}>
       {children}
     </div>
   )
 }
 
+/** Hero avatar size: as big as the screen comfortably allows (phones ≈ 170 px). */
+function heroSize(): number {
+  if (typeof window === 'undefined') return 150
+  return Math.round(Math.max(110, Math.min(window.innerWidth * 0.46, window.innerHeight * 0.22, 210)))
+}
+
 function Kicker({ children }: { children: ReactNode }) {
   return (
     <Rise>
-      <p className="text-[11px] uppercase tracking-[0.22em] font-semibold" style={{ color: GOLD }}>
+      <p className="text-[13px] uppercase tracking-[0.22em] font-semibold" style={{ color: GOLD }}>
         {children}
       </p>
     </Rise>
@@ -130,7 +137,7 @@ function Kicker({ children }: { children: ReactNode }) {
 function Title({ children, delay = 0.1 }: { children: ReactNode; delay?: number }) {
   return (
     <Rise delay={delay}>
-      <h2 className="font-[family-name:var(--font-display)] text-[clamp(1.6rem,7.5vw,2.25rem)] font-extrabold leading-tight mt-2" style={{ color: CREAM }}>
+      <h2 className="font-[family-name:var(--font-display)] text-[clamp(2rem,9.5vw,2.9rem)] font-extrabold leading-[1.1] mt-2" style={{ color: CREAM }}>
         {children}
       </h2>
     </Rise>
@@ -149,7 +156,7 @@ function Glow({ color, size }: { color: string; size: number }) {
 /** One or more stars of a slide: avatar(s) with name, optional glow/ring/ghosts. */
 function Heroes({
   players,
-  size = 120,
+  size,
   glow,
   streak = 0,
   eliminated = false,
@@ -162,17 +169,18 @@ function Heroes({
   eliminated?: boolean
   ghosts?: boolean
 }) {
-  const s = players.length > 1 ? Math.round(size * (players.length > 2 ? 0.6 : 0.75)) : size
+  const base = size ?? heroSize()
+  const s = players.length > 1 ? Math.round(base * (players.length > 2 ? 0.6 : 0.75)) : base
   return (
     <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-4">
       {players.map(p => (
-        <div key={p.id} className="flex flex-col items-center gap-2.5">
+        <div key={p.id} className="flex flex-col items-center gap-3">
           <div className="relative">
             {glow && <Glow color={glow} size={s} />}
             {ghosts && animationsEnabled() && <GhostBurst size={s} waves={GHOSTS} />}
             <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={s} winStreak={streak} eliminated={eliminated} />
           </div>
-          <span className="font-semibold text-lg leading-tight" style={{ color: CREAM }}>{p.name}</span>
+          <span className="font-bold text-2xl leading-tight" style={{ color: CREAM }}>{p.name}</span>
         </div>
       ))}
     </div>
@@ -182,19 +190,33 @@ function Heroes({
 function BigNumber({ children, sub, color = CREAM, delay = 0.35 }: { children: ReactNode; sub?: ReactNode; color?: string; delay?: number }) {
   return (
     <Rise delay={delay} className="text-center">
-      <p className="font-[family-name:var(--font-display)] text-6xl font-extrabold tabular-nums leading-none" style={{ color }}>
+      <p className="font-[family-name:var(--font-display)] text-[clamp(3.75rem,21vw,6rem)] font-extrabold tabular-nums leading-none" style={{ color }}>
         {children}
       </p>
-      {sub && <p className="text-sm mt-2" style={{ color: MUTED }}>{sub}</p>}
+      {sub && <p className="text-base mt-3 leading-snug" style={{ color: MUTED }}>{sub}</p>}
     </Rise>
   )
 }
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl px-3 py-3 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-      <p className="font-[family-name:var(--font-display)] text-3xl font-extrabold tabular-nums leading-none" style={{ color: CREAM }}>{children}</p>
-      <p className="text-[11px] mt-1.5 uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
+    <div className="rounded-2xl px-3 py-[clamp(0.5rem,1.9vh,1rem)] text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+      <p className="font-[family-name:var(--font-display)] text-[clamp(1.6rem,min(9vw,4.8vh),2.6rem)] font-extrabold tabular-nums leading-none" style={{ color: CREAM }}>{children}</p>
+      <p className="text-xs mt-2 uppercase tracking-wider" style={{ color: MUTED }}>{label}</p>
+    </div>
+  )
+}
+
+/** Overlapping avatars for ties. */
+function AvatarStack({ players, size, ghosts }: { players: Player[]; size: number; ghosts?: boolean }) {
+  return (
+    <div className="flex shrink-0">
+      {players.slice(0, 3).map((p, i) => (
+        <div key={p.id} className="relative" style={{ marginLeft: i > 0 ? -size * 0.35 : 0, zIndex: 3 - i }}>
+          {ghosts && animationsEnabled() && <GhostBurst size={size} waves={GHOSTS} />}
+          <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={size} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -202,19 +224,68 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 function Row({ players, title, text, delay, ghosts }: { players: Player[]; title: string; text: string; delay: number; ghosts?: boolean }) {
   return (
     <Rise delay={delay}>
-      <div className="flex items-center gap-3.5 rounded-2xl px-3.5 py-3 text-left" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-        {/* Ties: overlapping avatars */}
-        <div className="flex shrink-0">
-          {players.slice(0, 3).map((p, i) => (
-            <div key={p.id} className="relative" style={{ marginLeft: i > 0 ? -18 : 0, zIndex: 3 - i }}>
-              {ghosts && animationsEnabled() && <GhostBurst size={52} waves={GHOSTS} />}
-              <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={52} />
-            </div>
-          ))}
-        </div>
+      <div className="flex items-center gap-4 rounded-2xl px-4 py-4 text-left" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <AvatarStack players={players} size={64} ghosts={ghosts} />
         <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: GOLD }}>{title}</p>
-          <p className="font-semibold leading-snug" style={{ color: CREAM }}>{text}</p>
+          <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: GOLD }}>{title}</p>
+          <p className="text-lg font-semibold leading-snug mt-0.5" style={{ color: CREAM }}>{text}</p>
+        </div>
+      </div>
+    </Rise>
+  )
+}
+
+/** Compact tinted tile for "Deine Season": Erzfeind / Lieblingsgegner. */
+function OpponentTile({ label, color, opponents, text }: { label: string; color: string; opponents: Player[]; text: string }) {
+  return (
+    <div
+      className="rounded-2xl px-2.5 py-[clamp(0.5rem,1.5vh,0.75rem)] flex flex-col items-center text-center"
+      style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1.5px solid color-mix(in srgb, ${color} 50%, transparent)` }}
+    >
+      <p className="text-[11px] uppercase tracking-wider font-bold" style={{ color }}>{label}</p>
+      {opponents.length > 0 ? (
+        <>
+          <div className="mt-1.5"><AvatarStack players={opponents} size={Math.round(Math.min(52, heroSize() * 0.3))} /></div>
+          <p className="text-base font-bold leading-tight mt-1.5 truncate max-w-full" style={{ color: CREAM }}>{names(opponents)}</p>
+        </>
+      ) : (
+        <p className="text-3xl mt-2">🤷</p>
+      )}
+      <p className="text-sm leading-snug mt-0.5" style={{ color: MUTED }}>{text}</p>
+    </div>
+  )
+}
+
+/** Big tinted card for one highlight: who, how much, and a line of context. */
+function Spotlight({
+  players,
+  label,
+  color,
+  value,
+  sub,
+  delay,
+}: {
+  players: Player[]
+  label: string
+  color: string
+  value: ReactNode
+  sub?: ReactNode
+  delay: number
+}) {
+  return (
+    <Rise delay={delay}>
+      <div
+        className="rounded-3xl px-4 py-5 text-left flex items-center gap-4"
+        style={{ background: `color-mix(in srgb, ${color} 16%, transparent)`, border: `1.5px solid color-mix(in srgb, ${color} 55%, transparent)` }}
+      >
+        <AvatarStack players={players} size={Math.round(heroSize() * 0.5)} />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs uppercase tracking-[0.16em] font-bold" style={{ color }}>{label}</p>
+          <p className="text-xl font-bold leading-tight mt-1 truncate" style={{ color: CREAM }}>{names(players)}</p>
+          <p className="font-[family-name:var(--font-display)] text-[clamp(2.3rem,11vw,3.2rem)] font-extrabold tabular-nums leading-none mt-1.5" style={{ color }}>
+            {value}
+          </p>
+          {sub && <p className="text-sm mt-1.5 leading-snug" style={{ color: MUTED }}>{sub}</p>}
         </div>
       </div>
     </Rise>
@@ -231,7 +302,9 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
   const [failed, setFailed] = useState(false)
   const [idx, setIdx] = useState(0)
   const [cycle, setCycle] = useState(0) // bumps to restart the current slide
-  const [paused, setPaused] = useState(false)
+  const [held, setHeld] = useState(false) // finger held down on the slide
+  const [pinned, setPinned] = useState(false) // pause button
+  const paused = held || pinned
   const [me, setMe] = useState<string | null>(null)
   const [coins, setCoins] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -299,14 +372,14 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
               {d.season.end_date && ` – ${dateLabel(d.season.end_date)}`}
             </p>
           </Rise>
-          <Rise delay={0.5} className="grid grid-cols-2 gap-2.5 mt-8">
+          <Rise delay={0.5} className="grid grid-cols-2 gap-3 mt-10">
             <Fact label="Abende"><CountUp value={d.sessions} delay={0.6} /></Fact>
             <Fact label="Runden"><CountUp value={d.rounds} delay={0.7} /></Fact>
             <Fact label="Stunden am Tisch"><CountUp value={d.hours} decimals={d.hours < 10 ? 1 : 0} delay={0.8} /></Fact>
             <Fact label="€ gewonnen"><CountUp value={d.moneyMoved} delay={0.9} /></Fact>
           </Rise>
           <Rise delay={0.9}>
-            <p className="text-sm mt-5" style={{ color: MUTED }}>
+            <p className="text-base mt-6" style={{ color: MUTED }}>
               Im Schnitt {d.avgPlayers.toLocaleString('de-DE')} Spieler pro Runde
               {d.fires > 0 && ` · ${d.fires} Feuer`}
             </p>
@@ -319,7 +392,10 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
     if (ranked.length > 0) {
       const top = ranked.slice(0, 3)
       const order = [top[1], top[0], top[2]].filter(Boolean)
-      const steps: Record<number, number> = { 0: 104, 1: 74, 2: 52 }
+      // Steps and portraits grow with the screen.
+      const vh = typeof window === 'undefined' ? 800 : window.innerHeight
+      const steps: Record<number, number> = { 0: Math.round(vh * 0.17), 1: Math.round(vh * 0.12), 2: Math.round(vh * 0.085) }
+      const hero = heroSize()
       list.push({
         key: 'podium',
         bg: BG.gold,
@@ -331,25 +407,25 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center w-full">
             <Kicker>Das Podium</Kicker>
             <Title>Ganz oben: {top[0].player.name}</Title>
-            <div className="flex items-end justify-center gap-2 mt-8">
+            <div className="flex items-end justify-center gap-2 mt-12">
               {order.map(s => {
                 const rank = ranked.indexOf(s)
-                const size = rank === 0 ? 96 : 68
+                const size = Math.round(hero * (rank === 0 ? 0.68 : 0.48))
                 return (
-                  <div key={s.player.id} className="flex flex-col items-center flex-1 max-w-[120px]">
+                  <div key={s.player.id} className="flex flex-col items-center flex-1 min-w-0 max-w-[150px]">
                     <Rise delay={0.9 - rank * 0.25} className="flex flex-col items-center">
                       <div className="relative">
                         {rank === 0 && <Glow color="rgba(233,196,106,0.75)" size={size} />}
                         <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={size} />
-                        {rank === 0 && <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow-lg">👑</div>}
+                        {rank === 0 && <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-4xl drop-shadow-lg">👑</div>}
                       </div>
-                      <span className="font-semibold mt-2 truncate max-w-full" style={{ color: CREAM }}>{s.player.name}</span>
-                      <span className="text-sm font-bold tabular-nums" style={{ color: s.total_balance >= 0 ? PLUS : MINUS }}>
+                      <span className="text-lg font-bold mt-2 truncate max-w-full" style={{ color: CREAM }}>{s.player.name}</span>
+                      <span className="text-base font-bold tabular-nums" style={{ color: s.total_balance >= 0 ? PLUS : MINUS }}>
                         <CountUp value={s.total_balance} format={formatBalance} delay={1.1 - rank * 0.25} />
                       </span>
                     </Rise>
                     <div
-                      className="sw-grow w-full rounded-t-xl mt-2 flex items-start justify-center pt-2 font-[family-name:var(--font-display)] text-2xl font-extrabold"
+                      className="sw-grow w-full rounded-t-xl mt-2 flex items-start justify-center pt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold"
                       style={{
                         height: steps[rank],
                         animationDelay: `${0.5 - rank * 0.12}s`,
@@ -379,7 +455,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center">
             <Kicker>Die rote Laterne 🏮</Kicker>
             <Title>Irgendwer muss ja zahlen.</Title>
-            <Rise delay={0.35} className="mt-8">
+            <Rise delay={0.35} className="mt-10">
               <Heroes players={[last.player]} glow="rgba(240,138,126,0.45)" />
             </Rise>
             <BigNumber color={MINUS} delay={0.6} sub="Nächste Season wird alles besser. Vielleicht.">
@@ -400,21 +476,25 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center w-full">
             <Kicker>Abende für die Ewigkeit</Kicker>
             <Title>Ein Abend kann alles ändern.</Title>
-            <div className="space-y-3 mt-8">
+            <div className="space-y-4 mt-10">
               {d.bestEvening && (
-                <Row
+                <Spotlight
                   delay={0.4}
                   players={[d.bestEvening.player]}
-                  title={`Bester Abend · ${dayLabel(d.bestEvening.date)}`}
-                  text={`${d.bestEvening.player.name} räumt ${formatBalance(d.bestEvening.delta)} ab`}
+                  label="🌟 Bester Abend"
+                  color={PLUS}
+                  value={<CountUp value={d.bestEvening.delta} format={formatBalance} delay={0.5} />}
+                  sub={`${dayLabel(d.bestEvening.date)} – alles abgeräumt`}
                 />
               )}
               {d.worstEvening && (
-                <Row
-                  delay={0.8}
+                <Spotlight
+                  delay={0.9}
                   players={[d.worstEvening.player]}
-                  title={`Härtester Abend · ${dayLabel(d.worstEvening.date)}`}
-                  text={`${d.worstEvening.player.name} lässt ${euro(-d.worstEvening.delta)} liegen`}
+                  label="🥀 Härtester Abend"
+                  color={MINUS}
+                  value={<CountUp value={d.worstEvening.delta} format={formatBalance} delay={1} />}
+                  sub={`${dayLabel(d.worstEvening.date)} – zum Vergessen`}
                 />
               )}
             </div>
@@ -433,7 +513,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center">
             <Kicker>Hot Streak ☄️</Kicker>
             <Title>Nicht zu stoppen.</Title>
-            <Rise delay={0.35} className="mt-8">
+            <Rise delay={0.35} className="mt-10">
               <Heroes players={d.streak.players} streak={d.streak.value} />
             </Rise>
             <BigNumber delay={0.6} color={GOLD} sub="Siege am Stück – die längste Serie der Season">
@@ -455,7 +535,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center">
             <Kicker>Burning Man 🔥</Kicker>
             <Title>{d.fireKing.players.length > 1 ? 'Die Feuer-Könige' : 'Der Feuer-König'}</Title>
-            <Rise delay={0.35} className="mt-8">
+            <Rise delay={0.35} className="mt-10">
               <Heroes players={d.fireKing.players} streak={ON_FIRE_STREAK} />
             </Rise>
             <BigNumber delay={0.6} color="#FFB24A" sub={`von insgesamt ${d.fires} Feuern in der Season`}>
@@ -477,20 +557,57 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center w-full">
             <Kicker>Erster raus 💨</Kicker>
             <Title>Kaum gesetzt, schon weg.</Title>
-            <Rise delay={0.35} className="mt-7">
+            <Rise delay={0.35} className="mt-10">
               <Heroes players={d.firstOut.players} eliminated />
             </Rise>
             <BigNumber delay={0.6} sub="als Erster ausgeschieden – öfter als alle anderen">
               <CountUp value={d.firstOut.value} delay={0.7} format={n => `${n}×`} />
             </BigNumber>
-            {d.finalist && (
-              <Rise delay={1.4} className="mt-7">
-                <p className="text-sm" style={{ color: MUTED }}>
-                  Ganz anders {names(d.finalist.players)}: <span style={{ color: CREAM }} className="font-semibold">{d.finalist.value}× im Finale</span> –
-                  öfter als alle anderen unter den letzten zwei.
-                </p>
-              </Rise>
-            )}
+          </div>
+        ),
+      })
+    }
+
+    // 7b — Das Finale: most finals played / won
+    if (d.finalist || d.finalWinner) {
+      const quote = (p: Player) => {
+        const f = d.finals[p.id]
+        return f && f.played > 0 ? Math.round((f.won / f.played) * 100) : 0
+      }
+      list.push({
+        key: 'finals',
+        bg: BG.steel,
+        ms: SLIDE_MS + 500,
+        view: (
+          <div className="text-center w-full">
+            <Kicker>Das Finale 🥊</Kicker>
+            <Title>Wenn&apos;s drauf ankommt.</Title>
+            <div className="space-y-4 mt-10">
+              {d.finalist && (
+                <Spotlight
+                  delay={0.4}
+                  players={d.finalist.players}
+                  label="🎟️ Dauergast im Finale"
+                  color={GOLD}
+                  value={<CountUp value={d.finalist.value} delay={0.5} format={n => `${n}×`} />}
+                  sub="unter den letzten zwei – öfter als alle anderen"
+                />
+              )}
+              {d.finalWinner && (
+                <Spotlight
+                  delay={0.9}
+                  players={d.finalWinner.players}
+                  label="🏆 Finalkönig"
+                  color={PLUS}
+                  value={<CountUp value={d.finalWinner.value} delay={1} format={n => `${n}×`} />}
+                  sub={
+                    d.finalWinner.players.length === 1
+                      ? `Finals gewonnen – ${quote(d.finalWinner.players[0])} % aller eigenen Finals`
+                      : 'Finals gewonnen – die meisten der Season'
+                  }
+                />
+              )}
+            </div>
           </div>
         ),
       })
@@ -511,7 +628,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center w-full">
             <Kicker>Die Notaufnahme</Kicker>
             <Title>Totgesagte leben länger.</Title>
-            <div className="space-y-3 mt-8">
+            <div className="space-y-4 mt-10">
               {care.map((c, i) => (
                 <Row
                   key={c.title}
@@ -544,8 +661,8 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
               <CountUp value={r.stake} delay={0.45} format={euro} />
             </BigNumber>
             {r.winner && (
-              <Rise delay={1} className="mt-8">
-                <Heroes players={[r.winner]} size={96} glow="rgba(233,196,106,0.5)" />
+              <Rise delay={1} className="mt-10">
+                <Heroes players={[r.winner]} size={Math.round(heroSize() * 0.75)} glow="rgba(233,196,106,0.5)" />
                 <p className="text-sm mt-2" style={{ color: MUTED }}>
                   hat abgeräumt: <span className="font-semibold" style={{ color: PLUS }}>{formatBalance(gain)}</span>
                 </p>
@@ -568,8 +685,8 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center w-full">
             <Kicker>Stammgäste 🍺</Kicker>
             <Title>{d.regulars.length > 0 ? `Bei allen ${d.sessions} Abenden dabei` : 'Am häufigsten am Tisch'}</Title>
-            <Rise delay={0.4} className="mt-8">
-              <Heroes players={regulars} size={96} />
+            <Rise delay={0.4} className="mt-10">
+              <Heroes players={regulars} />
             </Rise>
             {d.regulars.length === 0 && (
               <Rise delay={0.7}>
@@ -591,7 +708,11 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           <div className="text-center w-full">
             <Kicker>Und jetzt du</Kicker>
             <Title>Wer bist du?</Title>
-            <Rise delay={0.3} className="grid grid-cols-3 gap-3 mt-7" >
+            <Rise
+              delay={0.3}
+              className="grid gap-[clamp(0.5rem,1.4vh,0.75rem)] mt-[clamp(1rem,3.5vh,2rem)]"
+              style={{ gridTemplateColumns: `repeat(${ranked.length > 9 ? 4 : 3}, minmax(0, 1fr))` }}
+            >
               {ranked.map(s => (
                 <button
                   key={s.player.id}
@@ -603,8 +724,8 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
                   className="flex flex-col items-center gap-1.5 rounded-2xl py-3 active:scale-95 transition-transform"
                   style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
                 >
-                  <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={56} />
-                  <span className="text-xs font-semibold truncate max-w-full px-1" style={{ color: CREAM }}>{s.player.name}</span>
+                  <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={Math.round(Math.min(72, heroSize() * 0.42))} />
+                  <span className="text-sm font-semibold truncate max-w-full px-1" style={{ color: CREAM }}>{s.player.name}</span>
                 </button>
               ))}
             </Rise>
@@ -621,6 +742,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
       if (mine) {
         const rank = ranked.indexOf(mine) + 1
         const nem = d.nemesis[mine.player.id]
+        const fav = d.favorite[mine.player.id]
         const best = d.personalBest[mine.player.id]
         const badges = d.badges[mine.player.id] ?? []
         list.push({
@@ -630,53 +752,77 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           view: (
             <div className="text-center w-full">
               <Kicker>Deine Season</Kicker>
-              <Rise delay={0.15} className="mt-5">
-                <Heroes players={[mine.player]} size={88} glow="rgba(233,196,106,0.35)" />
+              {/* Portrait left, rank + balance right: keeps the card one screen tall */}
+              <Rise delay={0.15} className="flex items-center justify-center gap-5 mt-[clamp(0.5rem,2.4vh,1.25rem)]">
+                <div className="relative">
+                  <Glow color="rgba(233,196,106,0.35)" size={Math.round(heroSize() * 0.55)} />
+                  <PlayerAvatar name={mine.player.name} avatarUrl={mine.player.avatar_url} size={Math.round(heroSize() * 0.55)} />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-2xl font-bold leading-tight truncate" style={{ color: CREAM }}>{mine.player.name}</p>
+                  <p className="text-base" style={{ color: MUTED }}>Platz {rank} von {ranked.length}</p>
+                  <p className="font-[family-name:var(--font-display)] text-[clamp(2.3rem,min(13vw,7vh),3.8rem)] font-extrabold tabular-nums leading-none mt-1" style={{ color: mine.total_balance >= 0 ? PLUS : MINUS }}>
+                    <CountUp value={mine.total_balance} format={formatBalance} delay={0.4} />
+                  </p>
+                </div>
               </Rise>
-              <Rise delay={0.3}>
-                <p className="text-sm mt-1" style={{ color: MUTED }}>Platz {rank} von {ranked.length}</p>
-                <p className="font-[family-name:var(--font-display)] text-5xl font-extrabold tabular-nums mt-1" style={{ color: mine.total_balance >= 0 ? PLUS : MINUS }}>
-                  <CountUp value={mine.total_balance} format={formatBalance} delay={0.4} />
-                </p>
-              </Rise>
-              <Rise delay={0.5} className="grid grid-cols-3 gap-2 mt-5">
+              <Rise delay={0.5} className="grid grid-cols-3 gap-2 mt-[clamp(0.5rem,2.4vh,1.25rem)]">
                 <Fact label="Siege">{mine.wins}</Fact>
                 <Fact label="Siegquote">{Math.round(mine.win_rate * 100)}%</Fact>
                 <Fact label="Abende">{d.attendance[mine.player.id] ?? 0}</Fact>
               </Rise>
-              <div className="space-y-2.5 mt-3">
-                {nem ? (
-                  <Row
-                    delay={0.7}
-                    players={nem.opponents}
-                    title="Dein Erzfeind 😤"
-                    text={`${nem.count} ${nem.count === 1 ? 'Finale' : 'Finals'} gegen ${names(nem.opponents)} verloren`}
-                  />
-                ) : (
-                  <Rise delay={0.7}>
-                    <p className="text-sm rounded-2xl px-3 py-3" style={{ color: CREAM, background: 'rgba(255,255,255,0.08)' }}>
-                      Kein Erzfeind – du hast kein einziges Finale verloren 💪
-                    </p>
-                  </Rise>
-                )}
+              <Rise delay={0.7} className="grid grid-cols-2 gap-2 mt-2">
+                <OpponentTile
+                  label="Erzfeind 😤"
+                  color={MINUS}
+                  opponents={nem?.opponents ?? []}
+                  text={nem ? `${nem.count} ${nem.count === 1 ? 'Finale' : 'Finals'} verloren` : 'kein Finale verloren 💪'}
+                />
+                <OpponentTile
+                  label="Lieblingsgegner 😎"
+                  color={PLUS}
+                  opponents={fav?.opponents ?? []}
+                  text={fav ? `${fav.count} ${fav.count === 1 ? 'Finale' : 'Finals'} gewonnen` : 'noch kein Finale gewonnen'}
+                />
+              </Rise>
+              <div className="space-y-[clamp(0.25rem,1.2vh,0.625rem)] mt-[clamp(0.375rem,1.5vh,0.75rem)]">
                 {best && (
-                  <Rise delay={0.85}>
-                    <p className="text-sm" style={{ color: MUTED }}>
-                      Dein bester Abend: <span className="font-semibold" style={{ color: PLUS }}>{formatBalance(best.delta)}</span> am {dayLabel(best.date)}
+                  <Rise delay={0.95}>
+                    <p className="text-base" style={{ color: MUTED }}>
+                      Dein bester Abend: <span className="font-semibold" style={{ color: PLUS }}>{formatBalance(best.delta)}</span> · {new Date(best.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
                     </p>
                   </Rise>
                 )}
-                {badges.length > 0 && (
-                  <Rise delay={1} className="flex flex-wrap justify-center gap-1.5 pt-1">
+                {badges.length > 0 && badges.length <= 4 && (
+                  <Rise delay={1.05} className="flex flex-wrap justify-center gap-1.5 pt-0.5">
                     {badges.map(b => (
-                      <span key={b.label} className="text-xs font-semibold rounded-full px-2.5 py-1" style={{ color: CREAM, background: 'rgba(233,196,106,0.18)', border: '1px solid rgba(233,196,106,0.4)' }}>
+                      <span key={b.label} className="text-[clamp(0.75rem,1.9vh,0.875rem)] font-semibold rounded-full px-[clamp(0.5rem,1.6vh,0.75rem)] py-[clamp(0.2rem,0.8vh,0.375rem)]" style={{ color: CREAM, background: 'rgba(233,196,106,0.18)', border: '1px solid rgba(233,196,106,0.4)' }}>
                         {b.icon} {b.label}
                       </span>
                     ))}
                   </Rise>
                 )}
+                {/* Many achievements: icons only, so the card still fits one screen */}
+                {badges.length > 4 && (
+                  <Rise delay={1.05} className="pt-0.5">
+                    <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: GOLD }}>{badges.length} Achievements</p>
+                    <div className="flex flex-wrap justify-center gap-1.5 mt-1.5">
+                      {badges.map(b => (
+                        <span
+                          key={b.label}
+                          title={b.label}
+                          aria-label={b.label}
+                          className="w-9 h-9 flex items-center justify-center rounded-full text-lg"
+                          style={{ background: 'rgba(233,196,106,0.18)', border: '1px solid rgba(233,196,106,0.4)' }}
+                        >
+                          {b.icon}
+                        </span>
+                      ))}
+                    </div>
+                  </Rise>
+                )}
               </div>
-              <Rise delay={1.1} className="flex gap-2 mt-5">
+              <Rise delay={1.15} className="flex gap-2 mt-[clamp(0.75rem,2.8vh,1.5rem)]">
                 <button {...stop} onClick={() => setIdx(i => i - 1)} className="flex-1 rounded-2xl py-3 text-sm font-semibold" style={{ color: CREAM, background: 'rgba(255,255,255,0.1)' }}>
                   Andere Person
                 </button>
@@ -690,7 +836,9 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
       }
     }
 
-    // 12 — Endstand + teilen
+    // 12 — Endstand + teilen: rows share the screen height (bigger on big phones)
+    const vhEnd = typeof window === 'undefined' ? 800 : window.innerHeight
+    const endRow = Math.round(Math.max(34, Math.min(58, (vhEnd - 330) / Math.max(1, ranked.length))))
     list.push({
       key: 'end',
       bg: BG.gold,
@@ -698,27 +846,27 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
       view: (
         <div className="text-center w-full">
           <Kicker>Endstand · {mainName}</Kicker>
-          <Title>Danke für eine legendäre Season!</Title>
-          <Rise delay={0.3} className="mt-5 rounded-2xl overflow-hidden text-left" >
+          <Title>Danke für diese Season!</Title>
+          <Rise delay={0.3} className="mt-[clamp(0.75rem,2.5vh,1.5rem)] rounded-2xl overflow-hidden text-left">
             <div style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.12)' }} className="rounded-2xl">
               {ranked.map((s, i) => (
-                <div key={s.player.id} className="flex items-center gap-3 px-3 py-2 border-b last:border-0" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-                  <span className="w-5 text-center font-bold tabular-nums text-sm" style={{ color: i === 0 ? GOLD : MUTED }}>{i + 1}</span>
-                  <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={32} />
-                  <span className="flex-1 min-w-0 truncate font-medium" style={{ color: CREAM }}>{s.player.name}</span>
-                  <span className="font-bold tabular-nums" style={{ color: s.total_balance >= 0 ? PLUS : MINUS }}>{formatBalance(s.total_balance)}</span>
+                <div key={s.player.id} className="flex items-center gap-3 px-3 border-b last:border-0" style={{ borderColor: 'rgba(255,255,255,0.1)', height: endRow }}>
+                  <span className="w-6 text-center font-bold tabular-nums" style={{ color: i === 0 ? GOLD : MUTED }}>{i + 1}</span>
+                  <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={endRow - 10} />
+                  <span className="flex-1 min-w-0 truncate font-semibold text-[clamp(0.95rem,2.2vh,1.15rem)]" style={{ color: CREAM }}>{s.player.name}</span>
+                  <span className="font-bold tabular-nums text-[clamp(0.95rem,2.2vh,1.15rem)]" style={{ color: s.total_balance >= 0 ? PLUS : MINUS }}>{formatBalance(s.total_balance)}</span>
                 </div>
               ))}
             </div>
           </Rise>
-          <Rise delay={0.5} className="grid grid-cols-2 gap-2 mt-5">
-            <button {...stop} onClick={() => share(d)} className="col-span-2 rounded-2xl py-3.5 font-semibold" style={{ color: '#1A1206', background: GOLD }}>
-              {copied ? 'In die Zwischenablage kopiert ✓' : '📤 Rückblick teilen'}
+          <Rise delay={0.5} className="flex gap-2 mt-[clamp(0.75rem,2.5vh,1.5rem)]">
+            <button {...stop} onClick={() => share(d)} className="flex-[1.6] rounded-2xl py-3.5 font-semibold" style={{ color: '#1A1206', background: GOLD }}>
+              {copied ? 'Kopiert ✓' : '📤 Teilen'}
             </button>
-            <button {...stop} onClick={() => { setIdx(0); setCycle(c => c + 1) }} className="rounded-2xl py-3 text-sm font-semibold" style={{ color: CREAM, background: 'rgba(255,255,255,0.1)' }}>
+            <button {...stop} onClick={() => { setIdx(0); setCycle(c => c + 1) }} className="flex-1 rounded-2xl py-3.5 text-sm font-semibold" style={{ color: CREAM, background: 'rgba(255,255,255,0.1)' }}>
               ↺ Nochmal
             </button>
-            <button {...stop} onClick={onClose} className="rounded-2xl py-3 text-sm font-semibold" style={{ color: CREAM, background: 'rgba(255,255,255,0.1)' }}>
+            <button {...stop} onClick={onClose} className="flex-1 rounded-2xl py-3.5 text-sm font-semibold" style={{ color: CREAM, background: 'rgba(255,255,255,0.1)' }}>
               Schließen
             </button>
           </Rise>
@@ -750,6 +898,10 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
       if (e.key === 'Escape') onClose()
       else if (e.key === 'ArrowRight') setIdx(i => Math.min(i + 1, slides.length - 1))
       else if (e.key === 'ArrowLeft') setIdx(i => Math.max(i - 1, 0))
+      else if (e.key === ' ') {
+        e.preventDefault()
+        setPinned(p => !p)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -767,7 +919,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
         }}
       >
         {/* Progress + close */}
-        <div className="shrink-0 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] max-w-md w-full mx-auto">
+        <div className="shrink-0 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] max-w-lg w-full mx-auto">
           <div className="flex gap-1">
             {slides.map((s, i) => (
               <div key={s.key} className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.25)' }}>
@@ -785,16 +937,30 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
             ))}
           </div>
           <div className="flex items-center justify-between mt-2.5">
-            <span className="text-xs font-semibold tracking-wide" style={{ color: MUTED }}>
-              {season.name} · Rückblick
+            <span className="text-xs font-semibold tracking-wide truncate min-w-0" style={{ color: MUTED }}>
+              {pinned ? '⏸ Pausiert' : `${season.name} · Rückblick`}
             </span>
-            <div className="flex items-center -mr-1.5">
+            <div className="flex items-center -mr-1.5 shrink-0">
+              <button
+                {...stop}
+                onClick={() => setPinned(p => !p)}
+                aria-label={pinned ? 'Weiter abspielen' : 'Pause'}
+                aria-pressed={pinned}
+                className="w-10 h-10 flex items-center justify-center rounded-full"
+                style={{ color: CREAM, background: pinned ? 'rgba(255,255,255,0.18)' : 'transparent' }}
+              >
+                {pinned ? (
+                  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3.5v11l9-5.5z" fill="currentColor" /></svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="4" y="3.5" width="3.5" height="11" rx="1" fill="currentColor" /><rect x="10.5" y="3.5" width="3.5" height="11" rx="1" fill="currentColor" /></svg>
+                )}
+              </button>
               {soundEnabled() && (
-                <button {...stop} onClick={toggleMusic} aria-label={musicOn ? 'Musik aus' : 'Musik an'} className="w-9 h-9 flex items-center justify-center rounded-full text-lg" style={{ color: CREAM }}>
+                <button {...stop} onClick={toggleMusic} aria-label={musicOn ? 'Musik aus' : 'Musik an'} className="w-10 h-10 flex items-center justify-center rounded-full text-lg" style={{ color: CREAM }}>
                   {musicOn ? '🔊' : '🔇'}
                 </button>
               )}
-              <button {...stop} onClick={onClose} aria-label="Schließen" className="w-9 h-9 flex items-center justify-center rounded-full text-xl" style={{ color: CREAM }}>
+              <button {...stop} onClick={onClose} aria-label="Schließen" className="w-10 h-10 flex items-center justify-center rounded-full text-xl" style={{ color: CREAM }}>
                 ✕
               </button>
             </div>
@@ -806,15 +972,15 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
           className="flex-1 min-h-0 overflow-y-auto flex"
           onPointerDown={() => {
             press.current = Date.now()
-            setPaused(true)
+            setHeld(true)
           }}
           onPointerUp={e => {
-            setPaused(false)
+            setHeld(false)
             if (Date.now() - press.current > 300) return
             if (e.clientX < window.innerWidth * 0.3) prev()
             else if (slide?.ms != null) next()
           }}
-          onPointerCancel={() => setPaused(false)}
+          onPointerCancel={() => setHeld(false)}
         >
           {failed ? (
             <div className="m-auto text-center px-6" style={{ color: CREAM }}>
@@ -826,7 +992,7 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
               <p className="text-sm mt-3" style={{ color: MUTED }}>Rückblick wird gemischt…</p>
             </div>
           ) : (
-            <div key={`${slide.key}-${cycle}`} className="m-auto w-full max-w-md px-6 py-6 flex flex-col items-center pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+            <div key={`${slide.key}-${cycle}`} className="m-auto w-full max-w-lg px-5 pt-[clamp(0.5rem,2.5vh,1.5rem)] flex flex-col items-center pb-[calc(clamp(0.75rem,2.5vh,1.5rem)+env(safe-area-inset-bottom))]">
               {slide.view}
             </div>
           )}

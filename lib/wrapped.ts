@@ -39,7 +39,11 @@ export type SeasonWrapped = {
   streak: Leaders | null
   fireKing: Leaders | null
   firstOut: Leaders | null
+  /** Most finals (last two standing) played / won. */
   finalist: Leaders | null
+  finalWinner: Leaders | null
+  /** Finals played and won per player id. */
+  finals: Record<string, { played: number; won: number }>
   medic: Leaders | null
   phoenix: Leaders | null
   comeback: Leaders | null
@@ -52,6 +56,8 @@ export type SeasonWrapped = {
   regulars: Player[]
   /** Per player: the opponent(s) they lost the most finals (last two standing) against. */
   nemesis: Record<string, { opponents: Player[]; count: number }>
+  /** Per player: the opponent(s) they beat in the most finals ("Lieblingsgegner"). */
+  favorite: Record<string, { opponents: Player[]; count: number }>
 }
 
 type WRound = {
@@ -165,28 +171,43 @@ export async function computeSeasonWrapped(supabase: SupabaseClient, season: Sea
     }
   }
 
-  // Erzfeind: the player you lost the most finals against
-  const lostFinals: Record<string, Record<string, number>> = {}
+  // Finals: the last two standing. The winner always played the final; a
+  // two-player round is a final from the start (reached_final is only set once
+  // a bigger table is down to two).
+  const finals: SeasonWrapped['finals'] = {}
+  const lostFinals: Record<string, Record<string, number>> = {} // loser → winner → n
+  const wonFinals: Record<string, Record<string, number>> = {} // winner → loser → n
   for (const r of rounds) {
     if (!r.winner_id) continue
     const table = rpsByRound[r.id] ?? []
-    for (const rp of table) {
-      // A two-player round is a final from the start (reached_final is only set
-      // once a bigger table is down to two).
-      if (rp.player_id === r.winner_id || !(rp.reached_final || table.length === 2)) continue
-      const byOpp = (lostFinals[rp.player_id] ??= {})
-      byOpp[r.winner_id] = (byOpp[r.winner_id] ?? 0) + 1
+    const losers = table.filter(rp => rp.player_id !== r.winner_id && (rp.reached_final || table.length === 2))
+    if (losers.length === 0) continue
+    const w = (finals[r.winner_id] ??= { played: 0, won: 0 })
+    w.played++
+    w.won++
+    for (const rp of losers) {
+      ;(finals[rp.player_id] ??= { played: 0, won: 0 }).played++
+      const lost = (lostFinals[rp.player_id] ??= {})
+      lost[r.winner_id] = (lost[r.winner_id] ?? 0) + 1
+      const won = (wonFinals[r.winner_id] ??= {})
+      won[rp.player_id] = (won[rp.player_id] ?? 0) + 1
     }
   }
-  const nemesis: SeasonWrapped['nemesis'] = {}
-  for (const [pid, byOpp] of Object.entries(lostFinals)) {
-    const count = Math.max(...Object.values(byOpp))
-    const opponents = Object.entries(byOpp)
-      .filter(([, n]) => n === count)
-      .map(([oid]) => playerById[oid])
-      .filter(Boolean)
-    if (opponents.length > 0) nemesis[pid] = { opponents, count }
+  // Erzfeind = most finals lost against; Lieblingsgegner = most finals won against.
+  const topOpponents = (tally: Record<string, Record<string, number>>) => {
+    const out: Record<string, { opponents: Player[]; count: number }> = {}
+    for (const [pid, byOpp] of Object.entries(tally)) {
+      const count = Math.max(...Object.values(byOpp))
+      const opponents = Object.entries(byOpp)
+        .filter(([, n]) => n === count)
+        .map(([oid]) => playerById[oid])
+        .filter(Boolean)
+      if (opponents.length > 0) out[pid] = { opponents, count }
+    }
+    return out
   }
+  const finalStat = (pick: (f: { played: number; won: number }) => number) =>
+    leaders(stats, s => (finals[s.player.id] ? pick(finals[s.player.id]) : 0))
 
   return {
     season,
@@ -203,7 +224,9 @@ export async function computeSeasonWrapped(supabase: SupabaseClient, season: Sea
     streak: leaders(stats, s => s.longest_streak),
     fireKing: leaders(stats, s => s.fires),
     firstOut: leaders(stats, s => s.first_eliminations),
-    finalist: leaders(stats, s => s.final_appearances),
+    finalist: finalStat(f => f.played),
+    finalWinner: finalStat(f => f.won),
+    finals,
     medic: leaders(stats, s => s.revives_given),
     phoenix: leaders(stats, s => s.revivals),
     comeback: leaders(stats, s => s.comebacks),
@@ -211,6 +234,7 @@ export async function computeSeasonWrapped(supabase: SupabaseClient, season: Sea
     personalBest,
     attendance,
     regulars,
-    nemesis,
+    nemesis: topOpponents(lostFinals),
+    favorite: topOpponents(wonFinals),
   }
 }
