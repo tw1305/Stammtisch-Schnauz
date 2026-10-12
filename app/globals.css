@@ -177,3 +177,32 @@ html[data-anim="off"] .wr-heat { animation: none !important; opacity: 1 !importa
 @media (prefers-reduced-motion: reduce) {
   .wr-sheen, .wr-glow, .wr-heat { animation: none !important; opacity: 1 !important; }
 }
+
+/* ---------- Season-Rückblick (components/ui/SeasonWrapped.tsx) ---------- */
+
+/* Story progress: the running bar IS the slide timer (animationend → next slide) */
+@keyframes sw-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.sw-progress { transform-origin: left; animation-name: sw-progress; animation-timing-function: linear; animation-fill-mode: forwards; }
+
+/* Slide content rises in, staggered via animation-delay */
+@keyframes sw-rise {
+  from { opacity: 0; transform: translateY(22px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.sw-rise { opacity: 0; animation: sw-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Podium steps grow out of the floor */
+@keyframes sw-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.sw-grow { transform-origin: bottom; transform: scaleY(0); animation: sw-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Soft pulsing glow behind the hero of a slide */
+@keyframes sw-glow { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.08); } }
+.sw-glow { animation: sw-glow 2.4s ease-in-out infinite; }
+
+html[data-anim="off"] .sw-rise,
+html[data-anim="off"] .sw-grow { animation: none !important; opacity: 1 !important; transform: none !important; }
+html[data-anim="off"] .sw-glow { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .sw-rise, .sw-grow { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .sw-glow { animation: none !important; }
+}

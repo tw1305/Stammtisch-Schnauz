@@ -20,6 +20,9 @@ import {
 } from '@/lib/stats'
 import Portal from '@/components/ui/Portal'
 import { SessionSummaryView } from '@/components/ui/SessionSummaryModal'
+import SeasonWrapped from '@/components/ui/SeasonWrapped'
+import { wrappedAvailable } from '@/lib/wrapped'
+import { initFeedback } from '@/lib/feedback'
 
 type SeasonWithStats = Season & { roundCount: number; avgStake: number }
 /** `number` is the chronological session number within the season (1 = oldest). */
@@ -41,6 +44,7 @@ export default function SeasonsPage() {
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [openSessions, setOpenSessions] = useState<Set<string>>(new Set())
+  const [wrappedSeason, setWrappedSeason] = useState<Season | null>(null)
 
   function toggleSession(id: string) {
     setOpenSessions(prev => {
@@ -51,7 +55,10 @@ export default function SeasonsPage() {
     })
   }
 
-  useEffect(() => { loadSeasons() }, [])
+  useEffect(() => {
+    loadSeasons()
+    initFeedback() // the tap that opens the recap unlocks its sounds
+  }, [])
 
   async function renameSeason() {
     if (!detailSeason) return
@@ -137,6 +144,9 @@ export default function SeasonsPage() {
     }
     setDetailSeason(updated)
     await loadSeasons()
+    // Finishing a season rolls straight into its recap.
+    const played = (seasons.find(x => x.id === season.id)?.roundCount ?? 0) > 0
+    if (status === 'completed' && played && wrappedAvailable(updated)) setWrappedSeason(updated)
   }
 
   async function loadSeasonDetail(season: Season) {
@@ -289,6 +299,10 @@ export default function SeasonsPage() {
         </div>
 
         <div className="px-4 py-2 space-y-6">
+          {wrappedAvailable(detailSeason) && seasonBalances.length > 0 && (
+            <WrappedButton onClick={() => setWrappedSeason(detailSeason)} />
+          )}
+
           {/* Balances */}
           <div>
             <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Saisonbilanz</p>
@@ -459,6 +473,8 @@ export default function SeasonsPage() {
             onSaved={() => { setEditingRound(null); if (detailSeason) loadSeasonDetail(detailSeason) }}
           />
         )}
+
+        {wrappedSeason && <SeasonWrapped season={wrappedSeason} onClose={() => setWrappedSeason(null)} />}
       </div>
     )
   }
@@ -509,10 +525,10 @@ export default function SeasonsPage() {
           <div className="text-center text-[#7C7461] py-10">Noch keine Seasons vorhanden.</div>
         ) : (
           seasons.map(s => (
+            <div key={s.id} className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] hover:border-[#2E6B3A]/50 transition-colors overflow-hidden">
             <button
-              key={s.id}
               onClick={() => { setOpenSessions(new Set()); loadSeasonDetail(s) }}
-              className="w-full text-left bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] p-4 hover:border-[#2E6B3A]/50 transition-colors"
+              className="w-full text-left p-4"
             >
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-semibold text-[#23201A]">{s.name}</span>
@@ -528,10 +544,33 @@ export default function SeasonsPage() {
                 {s.end_date && <span>bis {new Date(s.end_date).toLocaleDateString('de-DE')}</span>}
               </div>
             </button>
+            {wrappedAvailable(s) && s.roundCount > 0 && (
+              <div className="px-3 pb-3 -mt-1">
+                <WrappedButton compact onClick={() => setWrappedSeason(s)} />
+              </div>
+            )}
+            </div>
           ))
         )}
       </div>
+
+      {wrappedSeason && <SeasonWrapped season={wrappedSeason} onClose={() => setWrappedSeason(null)} />}
     </div>
+  )
+}
+
+/** Entry point to the season recap ("Wrapped"). */
+function WrappedButton({ onClick, compact = false }: { onClick: () => void; compact?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center justify-center gap-2 font-semibold text-[#FBF6EA] rounded-2xl shadow-sm active:scale-[0.98] transition-transform ${
+        compact ? 'py-2.5 text-sm' : 'py-4 text-base'
+      }`}
+      style={{ background: 'linear-gradient(135deg, #2E6B3A 0%, #16341D 60%, #6B4E16 100%)' }}
+    >
+      <span aria-hidden="true">✨</span> Season-Rückblick ansehen
+    </button>
   )
 }
 
