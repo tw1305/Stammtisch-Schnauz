@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import PlayerAvatar from './PlayerAvatar'
+import GhostBurst, { type GhostWave } from './GhostBurst'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import { animationsEnabled } from '@/lib/feedback'
 import { ON_FIRE_STREAK } from '@/lib/stats'
@@ -31,6 +32,11 @@ type Phase = 'award' | 'fly' | 'done'
 const AWARD_MS = 2000
 const FLY_MS = 750
 const AVATAR = 128
+/** "Aus dem Jenseits": a burst during the award, a smaller one once the portrait has landed. */
+const GHOST_WAVES: GhostWave[] = [
+  { delay: 0.6, count: 7 },
+  { delay: (AWARD_MS + FLY_MS) / 1000 + 0.2, count: 4 },
+]
 
 function streakText(streak: number): string | null {
   if (streak >= ON_FIRE_STREAK) return `🔥 ${streak} Siege in Folge – On Fire!`
@@ -52,6 +58,8 @@ export default function RoundResultModal({
   const winnerName = winner?.player?.name ?? 'Unbekannt'
   const winnerGain = winner?.balance_change ?? 0
   const streakLine = streakText(winnerStreak)
+  // Won "aus dem Jenseits": eliminated, revived, and then won the round.
+  const comeback = !!winner?.was_revived
 
   const [animated] = useState(() => animationsEnabled())
   const [phase, setPhase] = useState<Phase>(animated ? 'award' : 'done')
@@ -100,6 +108,7 @@ export default function RoundResultModal({
           style={{ top: window.innerHeight * 0.42 + (AVATAR * offset.s) / 2 + 22 }}
         >
           <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-white drop-shadow-lg">{winnerName} gewinnt!</p>
+          {comeback && <p className="text-[#DCE8FF] font-semibold mt-1 drop-shadow">👻 Aus dem Jenseits!</p>}
           {streakLine && <p className="text-[#FFD86B] font-semibold mt-1 drop-shadow">{streakLine}</p>}
         </div>
       )}
@@ -116,7 +125,9 @@ export default function RoundResultModal({
             style={{ background: 'linear-gradient(160deg, rgba(212,175,55,0.28), rgba(255,253,247,0.6))' }}
           />
           <div ref={avatarRef} className="relative mx-auto w-fit z-[1]" style={avatarStyle}>
-            <div className={animated ? 'award-pop' : undefined}>
+            <div className={`relative ${animated ? 'award-pop' : ''}`}>
+              {/* Behind the portrait (and its ring/flames): ghosts escaping past the rim */}
+              {comeback && animated && <GhostBurst size={AVATAR} waves={GHOST_WAVES} />}
               <PlayerAvatar
                 name={winnerName}
                 avatarUrl={winner?.player?.avatar_url}
@@ -133,6 +144,7 @@ export default function RoundResultModal({
               🏆 {winnerName} gewinnt!
             </h2>
             <p className="text-[#1F9D57] font-bold text-lg mt-1">{formatBalance(winnerGain)} in dieser Runde</p>
+            {comeback && <p className="text-[#4B5D86] font-semibold text-sm mt-1">👻 Aus dem Jenseits!</p>}
             {streakLine && <p className="text-[#9A6A0C] font-semibold text-sm mt-1">{streakLine}</p>}
           </div>
         </div>

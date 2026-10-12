@@ -33,6 +33,7 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'verbessert', text: 'Laufende Runde: Die Spielfläche nutzt jetzt den ganzen Bildschirm und die Spielericons sind deutlich größer – auf jedem Gerät ist alles ohne Scrollen sichtbar.' },
       { type: 'neu', text: 'Siegesserien sichtbar am Profilbild: nach einem Sieg ein goldener schimmernder Ring, nach zwei Siegen in Folge glüht er rot und erste Flammen und Funken züngeln, ab drei Siegen brennt das Feuer.' },
       { type: 'neu', text: 'Rundenende: Der Sieger erscheint groß in der Bildschirmmitte, bekommt Ring oder Flamme per Animation und fliegt dann in die (jetzt größere) Rundenübersicht.' },
+      { type: 'neu', text: 'Sieg „aus dem Jenseits“ (ausgeschieden, wiederbelebt, gewonnen): Geister fliegen hinter dem Profilbild des Siegers hervor – auch zusammen mit Ring, Glut oder Flamme.' },
       { type: 'verbessert', text: 'Der Feuerring sieht jetzt aus wie echtes Feuer statt wie gezeichnete Flammen.' },
       { type: 'verbessert', text: 'Hot Streak ☄️ zeigt die Länge der Siegesserie (z. B. „4 am Stück“) und wird auch bei kurzen Serien vergeben.' },
       { type: 'behoben', text: 'Der Sound blieb meist stumm, besonders beim Rundensieg – jetzt zuverlässig und lauter. Vibration mit eigenen Mustern, auf dem iPhone ab iOS 18 als Haptik.' },
