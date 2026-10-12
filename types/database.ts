@@ -71,6 +71,18 @@ export type RoundFire = {
   created_at: string
 }
 
+/** One paragraph (§) of the house rules. */
+export type Rule = {
+  id: string
+  section: string // topic / Abschnitt
+  title: string
+  body: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
 /** Aggregate key figures for the selected statistics scope (one season or all). */
 export type ScopeSummary = {
   rounds: number

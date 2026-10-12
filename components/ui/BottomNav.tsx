@@ -49,11 +49,22 @@ function TrophyIcon({ active }: IconProps) {
   )
 }
 
+function ParagraphIcon({ active }: IconProps) {
+  const c = stroke(active)
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M6 3.5h9.5L19 7v13.5H6z" stroke={c} strokeWidth="1.7" strokeLinejoin="round" fill={active ? '#2E6B3A' : 'none'} fillOpacity={active ? 0.12 : 0} />
+      <path d="M14.6 10.3c0-1-1-1.6-2.1-1.6-1.2 0-2 .6-2 1.4 0 1.9 4.2 1.4 4.2 3.5 0 .9-.9 1.5-2.1 1.5M10.4 15.5c0 1 1 1.6 2.1 1.6 1.2 0 2-.6 2-1.4 0-1.9-4.2-1.4-4.2-3.5 0-.9.9-1.5 2.1-1.5" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 const tabs = [
   { href: '/spiel', label: 'Spiel', Icon: CardIcon },
   { href: '/spieler', label: 'Spieler', Icon: PeopleIcon },
   { href: '/statistiken', label: 'Statistik', Icon: ChartIcon },
   { href: '/seasons', label: 'Seasons', Icon: TrophyIcon },
+  { href: '/regeln', label: 'Regeln', Icon: ParagraphIcon },
 ]
 
 export default function BottomNav() {
@@ -71,7 +82,7 @@ export default function BottomNav() {
               className="flex-1 flex flex-col items-center justify-center pt-3 pb-2.5 gap-1.5 min-h-[68px]"
             >
               <div
-                className={`w-14 h-9 rounded-full flex items-center justify-center transition-colors duration-200 ${
+                className={`w-12 h-9 rounded-full flex items-center justify-center transition-colors duration-200 ${
                   active ? 'bg-[#2E6B3A]/15' : 'bg-transparent'
                 }`}
               >
