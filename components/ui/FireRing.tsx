@@ -14,9 +14,9 @@ import { getFireSprites, FIRE_SPRITE_STEPS } from './fireSprites'
  * itself is drawn on top by PlayerAvatar.
  */
 
-const W_FACTOR = 1.9 // canvas width relative to avatar size
-const H_FACTOR = 2.2 // canvas height (extra headroom for rising flames)
-const CY = 0.6 // avatar centre as a fraction of canvas height
+const W_FACTOR = 2.3 // canvas width relative to avatar size
+const H_FACTOR = 2.7 // canvas height (extra headroom for rising flames)
+const CY = 0.66 // avatar centre as a fraction of canvas height
 
 type P = { x: number; y: number; vx: number; vy: number; life: number; max: number; r: number; seed: number }
 
@@ -55,10 +55,10 @@ export default function FireRing({ size }: { size: number }) {
         x,
         y,
         vx: Math.cos(a) * out * (size / 100),
-        vy: -(1.3 + Math.random() * 1.8) * (size / 100) + Math.sin(a) * 0.25 * (size / 100),
+        vy: -(0.9 + Math.random() * 1.1) * (size / 100) + Math.sin(a) * 0.25 * (size / 100),
         life: 0,
-        max: 30 + Math.random() * 34,
-        r: size * (0.1 + Math.random() * 0.13),
+        max: 24 + Math.random() * 22,
+        r: size * (0.08 + Math.random() * 0.1),
         seed: Math.random() * 1000,
       })
     }
@@ -75,7 +75,7 @@ export default function FireRing({ size }: { size: number }) {
         // Flicker: sideways turbulence; flames accelerate upward as they heat the air.
         p.vx += Math.sin(t * 0.008 + p.seed) * 0.03 * (size / 100)
         p.vx *= 0.96
-        p.vy -= 0.035 * (size / 100)
+        p.vy -= 0.02 * (size / 100)
         p.x += p.vx
         p.y += p.vy
       }

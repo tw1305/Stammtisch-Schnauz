@@ -88,10 +88,13 @@ export default function SpielPage() {
   }, [])
 
   /** Shows a one-shot animation on a player's seat (if animations are enabled). */
-  function playEffect(kind: EffectKind, playerId: string) {
+  function playEffect(kind: EffectKind, playerId: string, fromPlayerId?: string) {
     if (!animationsEnabled()) return
     const id = ++effectId.current
-    setEffects(list => [...list, { id, kind, playerId }])
+    const holdGray = kind === 'revive'
+    setEffects(list => [...list, { id, kind, playerId, fromPlayerId, holdGray }])
+    // Revive: the avatar regains its colour once the syringe has injected.
+    if (holdGray) setTimeout(() => setEffects(list => list.map(e => (e.id === id ? { ...e, holdGray: false } : e))), 1350)
     setTimeout(() => setEffects(list => list.filter(e => e.id !== id)), EFFECT_DURATION[kind])
   }
 
@@ -437,7 +440,7 @@ export default function SpielPage() {
               setReviveTarget(null)
               if (target) {
                 feedbackRevive()
-                playEffect('revive', target)
+                playEffect('revive', target, reviverId)
                 await revivePlayer(target, reviverId)
               }
             }}

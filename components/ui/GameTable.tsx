@@ -2,7 +2,7 @@
 
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from './PlayerAvatar'
-import { PlayerEffect, type GameEffect } from './GameEffects'
+import { PlayerEffect, SyringeFlight, type GameEffect } from './GameEffects'
 import type { SessionPlayer, RoundPlayer } from '@/types/database'
 
 type GameTableProps = {
@@ -119,6 +119,15 @@ export default function GameTable({
     }
   })
 
+  function playerEffectsFor(playerId: string) {
+    return effects.filter(e => e.playerId === playerId)
+  }
+
+  function seatOf(playerId: string) {
+    const i = sessionPlayers.findIndex(sp => sp.player_id === playerId)
+    return i >= 0 ? positions[i] : null
+  }
+
   function getRoundPlayer(playerId: string): RoundPlayer | undefined {
     return roundPlayers.find(rp => rp.player_id === playerId)
   }
@@ -158,11 +167,13 @@ export default function GameTable({
       {sessionPlayers.map((sp, i) => {
         const pos = positions[i]
         const rp = getRoundPlayer(sp.player_id)
-        const isEliminated = isRoundActive && rp ? !rp.is_active : false
+        // A revive animation keeps the player grey until the syringe has injected.
+        const heldGray = playerEffectsFor(sp.player_id).some(e => e.kind === 'revive' && e.holdGray)
+        const isEliminated = isRoundActive && rp ? !rp.is_active || heldGray : false
         const isWinner = isRoundActive && rp ? rp.is_winner : false
         const balance = sessionBalances[sp.player_id] ?? 0
         const player = sp.player!
-        const playerEffects = effects.filter(e => e.playerId === sp.player_id)
+        const playerEffects = playerEffectsFor(sp.player_id)
 
         return (
           <button
@@ -223,6 +234,15 @@ export default function GameTable({
             </div>
           </button>
         )
+      })}
+
+      {/* Revive syringes travel across the table from the reviver to the revived */}
+      {effects.map(e => {
+        if (e.kind !== 'revive' || !e.fromPlayerId) return null
+        const from = seatOf(e.fromPlayerId)
+        const to = seatOf(e.playerId)
+        if (!from || !to) return null
+        return <SyringeFlight key={e.id} from={from} to={to} avatar={avatar} />
       })}
     </div>
   )

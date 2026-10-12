@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Portal from '@/components/ui/Portal'
+import BackHeader from '@/components/ui/BackHeader'
 import { DEFAULT_RULES, SORT_STEP, groupRules, displayOrder, rulesLastChanged, toRoman } from '@/lib/rules'
 import type { Rule } from '@/types/database'
 
@@ -144,24 +145,22 @@ export default function RegelnPage() {
   }
 
   return (
-    <div className="flex flex-col max-w-md mx-auto w-full px-3 pt-5 pb-6">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <span className="text-[#7C7461] text-xs uppercase tracking-[0.2em] font-medium">Regeln</span>
+    <div className="flex flex-col max-w-md mx-auto w-full pb-6">
+      <BackHeader title="Regeln">
         {!missingTable && (
           <button
             onClick={() => setEditMode(v => !v)}
-            className={`h-9 px-3.5 rounded-full text-sm font-semibold border transition-colors ${
+            className={`h-9 px-3.5 rounded-full text-sm font-semibold border transition-colors shrink-0 ${
               editMode ? 'bg-[#2E6B3A] border-[#2E6B3A] text-white' : 'bg-[#FBF6EA] border-[#E4D9BF] text-[#23201A]'
             }`}
           >
             {editMode ? '✓ Fertig' : '✏️ Bearbeiten'}
           </button>
         )}
-      </div>
+      </BackHeader>
 
       {missingTable && (
-        <div className="mb-3 rounded-xl border border-[#C8443B]/40 bg-[#C8443B]/5 px-3 py-2.5 text-xs text-[#8A2E28] leading-snug">
+        <div className="mx-3 mb-3 rounded-xl border border-[#C8443B]/40 bg-[#C8443B]/5 px-3 py-2.5 text-xs text-[#8A2E28] leading-snug">
           Bearbeiten ist erst möglich, wenn die Datenbank-Migration <code>20261012_rules.sql</code> ausgeführt wurde.
           Angezeigt wird die Ausgangsfassung.
         </div>
@@ -169,7 +168,7 @@ export default function RegelnPage() {
 
       {/* The document */}
       <article
-        className="relative bg-[#FFFDF7] rounded-sm shadow-[0_2px_10px_rgba(60,45,20,0.12)] px-5 pt-7 pb-6"
+        className="relative mx-3 bg-[#FFFDF7] rounded-sm shadow-[0_2px_10px_rgba(60,45,20,0.12)] px-5 pt-7 pb-6"
         style={{ fontFamily: SERIF, color: INK, border: '1px solid #CDBF9C', outline: '3px double #B9A77E', outlineOffset: '-9px' }}
       >
         {/* Heading */}

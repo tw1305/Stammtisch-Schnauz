@@ -213,16 +213,169 @@ export function initFeedback() {
   }
 }
 
+// ---------- Sound building blocks ----------
+
+let brownBuf: AudioBuffer | null = null
+
+/** Brown (red) noise: deep, rumbling — the body of a fire's roar. */
+function brown(c: AudioContext): AudioBuffer {
+  if (brownBuf && brownBuf.sampleRate === c.sampleRate) return brownBuf
+  const len = Math.floor(c.sampleRate * 3)
+  brownBuf = c.createBuffer(1, len, c.sampleRate)
+  const d = brownBuf.getChannelData(0)
+  let last = 0
+  for (let i = 0; i < len; i++) {
+    last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02
+    d[i] = last * 3.5
+  }
+  return brownBuf
+}
+
+/** Output node, optionally panned left/right (coins land all around you). */
+function panned(c: AudioContext, out: AudioNode, pan: number): AudioNode {
+  if (!pan || typeof c.createStereoPanner !== 'function') return out
+  const p = c.createStereoPanner()
+  p.pan.value = Math.max(-1, Math.min(1, pan))
+  p.connect(out)
+  return p
+}
+
+const rand = (a: number, b: number) => a + Math.random() * (b - a)
+
+// ---------- Fart synthesis ----------
+
+type FartParams = {
+  dur: number // seconds
+  f0: number // start pitch (Hz)
+  f1: number // end pitch (Hz)
+  wobble: number // pitch wobble rate (Hz)
+  wobbleDepth: number // pitch wobble depth (Hz)
+  flutter: number // "brrrr" amplitude flutter rate (Hz)
+  cutoff: number // lowpass cutoff — lower = muffled, higher = squeaky
+  q: number // filter resonance
+  air: number // amount of breathy noise (0..1)
+  wave: OscillatorType
+}
+
+/** One toot: buzzing oscillator + pitch wobble + amplitude flutter + air, through a resonant lowpass. */
+function toot(start: number, p: FartParams, gain = 0.5) {
+  const a = audio()
+  if (!a) return
+  const { ctx: c, out } = a
+  const t0 = c.currentTime + start
+  const t1 = t0 + p.dur
+
+  const osc = c.createOscillator()
+  osc.type = p.wave
+  osc.frequency.setValueAtTime(p.f0, t0)
+  osc.frequency.exponentialRampToValueAtTime(Math.max(20, p.f1), t1)
+
+  // Pitch wobble
+  const lfo = c.createOscillator()
+  lfo.frequency.value = p.wobble
+  const lfoGain = c.createGain()
+  lfoGain.gain.value = p.wobbleDepth
+  lfo.connect(lfoGain)
+  lfoGain.connect(osc.frequency)
+
+  // Amplitude flutter ("brrrr")
+  const am = c.createGain()
+  am.gain.value = 0.6
+  const flut = c.createOscillator()
+  flut.type = 'square'
+  flut.frequency.setValueAtTime(p.flutter, t0)
+  flut.frequency.linearRampToValueAtTime(p.flutter * rand(0.7, 1.3), t1)
+  const flutGain = c.createGain()
+  flutGain.gain.value = 0.4
+  flut.connect(flutGain)
+  flutGain.connect(am.gain)
+
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.setValueAtTime(p.cutoff, t0)
+  lp.frequency.exponentialRampToValueAtTime(p.cutoff * 0.6, t1)
+  lp.Q.value = p.q
+
+  const env = c.createGain()
+  env.gain.setValueAtTime(0.0001, t0)
+  env.gain.exponentialRampToValueAtTime(gain, t0 + 0.025)
+  env.gain.setValueAtTime(gain, Math.max(t0 + 0.03, t1 - 0.08))
+  env.gain.exponentialRampToValueAtTime(0.0001, t1)
+
+  osc.connect(am)
+  am.connect(lp)
+  lp.connect(env)
+  env.connect(out)
+
+  // Breathy air
+  if (p.air > 0) {
+    const n = c.createBufferSource()
+    n.buffer = noise(c)
+    const bp = c.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = p.cutoff * 0.9
+    bp.Q.value = 0.9
+    const ng = c.createGain()
+    ng.gain.value = p.air
+    n.connect(bp)
+    bp.connect(ng)
+    ng.connect(am)
+    n.start(t0)
+    n.stop(t1 + 0.05)
+  }
+
+  for (const o of [osc, lfo, flut]) {
+    o.start(t0)
+    o.stop(t1 + 0.05)
+  }
+}
+
+/** Fart archetypes; each is randomised further on every call. */
+const FARTS: (() => void)[] = [
+  // Klassiker
+  () => toot(0, { dur: rand(0.45, 0.7), f0: rand(85, 110), f1: rand(65, 85), wobble: rand(7, 11), wobbleDepth: 12, flutter: rand(24, 32), cutoff: 750, q: 4, air: 0.15, wave: 'sawtooth' }),
+  // Quietscher
+  () => toot(0, { dur: rand(0.28, 0.42), f0: rand(230, 280), f1: rand(300, 380), wobble: rand(12, 16), wobbleDepth: 30, flutter: rand(40, 52), cutoff: 2200, q: 6, air: 0.05, wave: 'square' }, 0.32),
+  // Donnergrollen
+  () => toot(0, { dur: rand(0.9, 1.3), f0: rand(62, 78), f1: rand(48, 60), wobble: rand(4, 6), wobbleDepth: 8, flutter: rand(16, 21), cutoff: 480, q: 3, air: 0.3, wave: 'sawtooth' }, 0.65),
+  // Stotterer: 3–5 kurze Stöße
+  () => {
+    const n = 3 + Math.floor(Math.random() * 3)
+    let t = 0
+    for (let i = 0; i < n; i++) {
+      const d = rand(0.07, 0.13)
+      toot(t, { dur: d, f0: rand(95, 150), f1: rand(80, 120), wobble: 10, wobbleDepth: 10, flutter: 30, cutoff: 850, q: 4, air: 0.1, wave: 'sawtooth' }, 0.45)
+      t += d + rand(0.04, 0.09)
+    }
+  },
+  // Luft ablassen (absteigend)
+  () => toot(0, { dur: rand(0.8, 1.1), f0: rand(170, 210), f1: rand(60, 75), wobble: rand(8, 12), wobbleDepth: 18, flutter: rand(30, 40), cutoff: 1300, q: 5, air: 0.12, wave: 'sawtooth' }),
+  // Feucht
+  () => {
+    toot(0, { dur: rand(0.5, 0.7), f0: rand(75, 95), f1: rand(60, 75), wobble: 6, wobbleDepth: 10, flutter: rand(18, 24), cutoff: 600, q: 2, air: 0.6, wave: 'sawtooth' }, 0.55)
+    for (let i = 0; i < 4; i++) hiss(rand(0.05, 0.55), 0.03, { type: 'bandpass', from: rand(250, 500), gain: 0.35, q: 4 })
+  },
+  // Fragend (steigt am Ende)
+  () => toot(0, { dur: rand(0.45, 0.6), f0: rand(85, 100), f1: rand(150, 190), wobble: 9, wobbleDepth: 14, flutter: rand(26, 34), cutoff: 1000, q: 5, air: 0.1, wave: 'square' }, 0.4),
+  // Doppelschlag
+  () => {
+    toot(0, { dur: 0.22, f0: rand(100, 120), f1: 90, wobble: 9, wobbleDepth: 10, flutter: 28, cutoff: 800, q: 4, air: 0.12, wave: 'sawtooth' })
+    toot(0.3, { dur: rand(0.4, 0.55), f0: rand(80, 95), f1: 65, wobble: 7, wobbleDepth: 12, flutter: 24, cutoff: 650, q: 4, air: 0.2, wave: 'sawtooth' })
+  },
+]
+
+let lastFart = -1
+
 // ---------- Game sounds ----------
 
-/** Player knocked out: heavy thud + sad "womp womp" + vibration. */
+/** Player knocked out: a fart — a different one than last time. */
 export function feedbackEliminate() {
   if (!feedbackEnabled()) return
   vib([90, 60, 180])
-  tone(150, 0, 0.25, { type: 'sine', to: 55, gain: 0.5 })
-  hiss(0, 0.18, { from: 900, to: 120, gain: 0.35 })
-  tone(330, 0.18, 0.32, { type: 'sawtooth', to: 311, gain: 0.16, lowpass: 1400 })
-  tone(294, 0.5, 0.6, { type: 'sawtooth', to: 220, gain: 0.16, lowpass: 1200 })
+  let i = Math.floor(Math.random() * FARTS.length)
+  if (i === lastFart) i = (i + 1 + Math.floor(Math.random() * (FARTS.length - 1))) % FARTS.length
+  lastFart = i
+  FARTS[i]()
 }
 
 /** Player revived: injection hiss + rising sparkle arpeggio. */
@@ -238,27 +391,138 @@ export function feedbackRevive() {
   tone(2093, 0.6, 0.6, { type: 'sine', gain: 0.08 })
 }
 
-/** Feuer (three aces): explosion boom + crackle. */
+/** Feuer (three aces): ignition whoosh, roaring blaze and crackling embers. */
 export function feedbackFire() {
   if (!feedbackEnabled()) return
-  vib([220, 60, 120, 60, 70])
-  tone(140, 0, 0.6, { type: 'sine', to: 40, gain: 0.7 })
-  hiss(0, 1.1, { from: 4000, to: 180, gain: 0.7 })
-  hiss(0.05, 0.5, { type: 'bandpass', from: 1500, to: 400, gain: 0.35, q: 1.5 })
-  // Crackling embers
-  for (let i = 0; i < 10; i++) {
-    hiss(0.25 + Math.random() * 0.9, 0.035, { type: 'highpass', from: 2500 + Math.random() * 2500, gain: 0.25 })
+  const a = audio()
+  if (!a) return
+  const { ctx: c, out } = a
+  vib([220, 60, 120, 60, 70, 60, 50])
+  const t0 = c.currentTime
+
+  // "Wumm" of the ignition
+  tone(110, 0, 0.45, { type: 'sine', to: 42, gain: 0.45 })
+  // Whoosh as the flames catch: noise sweeping up
+  hiss(0, 0.6, { type: 'bandpass', from: 250, to: 2600, gain: 0.45, q: 0.8 })
+
+  // Roar: brown noise through a lowpass, swelling and flickering
+  const roar = c.createBufferSource()
+  roar.buffer = brown(c)
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.setValueAtTime(350, t0)
+  lp.frequency.linearRampToValueAtTime(900, t0 + 0.4)
+  lp.frequency.linearRampToValueAtTime(500, t0 + 2.4)
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.0001, t0)
+  g.gain.exponentialRampToValueAtTime(0.55, t0 + 0.3)
+  g.gain.setValueAtTime(0.55, t0 + 1.4)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.6)
+  const flicker = c.createOscillator()
+  flicker.frequency.value = rand(4, 7)
+  const fg = c.createGain()
+  fg.gain.value = 0.15
+  flicker.connect(fg)
+  fg.connect(g.gain)
+  roar.connect(lp)
+  lp.connect(g)
+  g.connect(out)
+  roar.start(t0)
+  roar.stop(t0 + 2.7)
+  flicker.start(t0)
+  flicker.stop(t0 + 2.7)
+
+  // Licking flames: mid-range hiss fluttering quickly
+  const lick = c.createBufferSource()
+  lick.buffer = noise(c)
+  const bp = c.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.value = 1100
+  bp.Q.value = 0.6
+  const lg = c.createGain()
+  lg.gain.setValueAtTime(0.0001, t0)
+  lg.gain.exponentialRampToValueAtTime(0.18, t0 + 0.35)
+  lg.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.3)
+  const lf = c.createOscillator()
+  lf.frequency.value = rand(9, 13)
+  const lfg = c.createGain()
+  lfg.gain.value = 0.1
+  lf.connect(lfg)
+  lfg.connect(lg.gain)
+  lick.connect(bp)
+  bp.connect(lg)
+  lg.connect(out)
+  lick.start(t0)
+  lick.stop(t0 + 2.4)
+  lf.start(t0)
+  lf.stop(t0 + 2.4)
+
+  // Crackling wood: many tiny sharp pops, denser early on
+  for (let i = 0; i < 40; i++) {
+    const t = 0.15 + Math.pow(Math.random(), 1.4) * 2.1
+    hiss(t, rand(0.006, 0.02), { type: 'highpass', from: rand(1800, 6000), gain: rand(0.15, 0.55) })
+  }
+  // A few deeper knots popping
+  for (let i = 0; i < 6; i++) {
+    hiss(rand(0.3, 2), 0.035, { type: 'bandpass', from: rand(350, 800), gain: 0.45, q: 3 })
   }
 }
 
-/** Round won: shower of coin "pling"s. */
+/** One coin hitting something: short inharmonic metallic ring, panned. */
+function clink(start: number, freq: number, gain: number, pan: number) {
+  const a = audio()
+  if (!a) return
+  const { ctx: c, out } = a
+  const t0 = c.currentTime + start
+  const dest = panned(c, out, pan)
+  // Inharmonic partials of a small metal disc
+  const partials: [number, number, number][] = [
+    [1, 1, rand(0.18, 0.4)],
+    [2.76, 0.5, rand(0.1, 0.2)],
+    [5.4, 0.25, rand(0.05, 0.1)],
+  ]
+  for (const [ratio, amp, decay] of partials) {
+    const o = c.createOscillator()
+    o.frequency.value = freq * ratio
+    const g = c.createGain()
+    g.gain.setValueAtTime(0.0001, t0)
+    g.gain.exponentialRampToValueAtTime(gain * amp, t0 + 0.002)
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + decay)
+    o.connect(g)
+    g.connect(dest)
+    o.start(t0)
+    o.stop(t0 + decay + 0.02)
+  }
+  // Impact click
+  const n = c.createBufferSource()
+  n.buffer = noise(c)
+  const hp = c.createBiquadFilter()
+  hp.type = 'highpass'
+  hp.frequency.value = 5000
+  const ng = c.createGain()
+  ng.gain.setValueAtTime(gain * 0.8, t0)
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.012)
+  n.connect(hp)
+  hp.connect(ng)
+  ng.connect(dest)
+  n.start(t0)
+  n.stop(t0 + 0.02)
+}
+
+/** Round won: a real shower of coins raining down, clinking and bouncing. */
 export function feedbackWinner() {
   if (!feedbackEnabled()) return
-  vib([40, 40, 40, 40, 40, 40, 260])
-  const coin = (t: number, pitch = 1, gain = 0.16) => {
-    tone(988 * pitch, t, 0.07, { type: 'square', gain, lowpass: 5000 })
-    tone(1319 * pitch, t + 0.07, 0.38, { type: 'square', gain, lowpass: 5000 })
+  vib([40, 40, 40, 40, 40, 40, 40, 40, 260])
+  // Jingling bed: the pile of coins shimmering
+  hiss(0.05, 2.2, { type: 'bandpass', from: 7000, to: 5500, gain: 0.09, q: 1.2 })
+  for (let i = 0; i < 48; i++) {
+    const t = 0.03 + Math.pow(Math.random(), 1.35) * 2.0
+    const f = rand(2300, 4800)
+    const g = rand(0.11, 0.26)
+    const pan = rand(-0.8, 0.8)
+    clink(t, f, g, pan)
+    // Most coins bounce once or twice with a slightly lower ring
+    if (Math.random() < 0.7) clink(t + rand(0.06, 0.12), f * rand(0.97, 1.02), g * 0.45, pan)
+    if (Math.random() < 0.3) clink(t + rand(0.15, 0.22), f * rand(0.97, 1.02), g * 0.2, pan)
   }
-  coin(0, 1, 0.2)
-  for (let i = 1; i < 9; i++) coin(0.12 + i * 0.13 + Math.random() * 0.05, 0.94 + Math.random() * 0.14, 0.09)
 }

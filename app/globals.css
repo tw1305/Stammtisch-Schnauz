@@ -78,33 +78,26 @@ body {
 }
 .fx-dust { animation: fx-dust 1.9s ease-out forwards; }
 
-/* Revive syringe: flies in, injects (plunger + draining serum), flies out */
-@keyframes fx-syringe {
-  0% { transform: translate(70%, -70%); opacity: 0; }
-  22% { transform: translate(0, 0); opacity: 1; }
-  70% { transform: translate(-4%, 4%); opacity: 1; }
-  100% { transform: translate(60%, -60%); opacity: 0; }
-}
-.fx-syringe { animation: fx-syringe 1.7s cubic-bezier(0.3, 0.9, 0.4, 1) forwards; }
-
+/* Revive: syringe flies reviver → revived (Web Animations, 2.2s), injects on arrival
+   (45–72%), then the heal pulse spreads out on the revived player */
 @keyframes fx-plunger {
-  0%, 25% { transform: translateX(0); }
-  65%, 100% { transform: translateX(46px); }
+  0%, 45% { transform: translateX(0); }
+  72%, 100% { transform: translateX(46px); }
 }
-.fx-plunger { animation: fx-plunger 1.7s ease-in-out forwards; }
+.fx-plunger { animation: fx-plunger 2.2s ease-in-out forwards; }
 
 @keyframes fx-serum {
-  0%, 25% { transform: scaleX(1); }
-  65%, 100% { transform: scaleX(0.08); }
+  0%, 45% { transform: scaleX(1); }
+  72%, 100% { transform: scaleX(0.08); }
 }
-.fx-serum { transform-box: fill-box; transform-origin: 100% 50%; animation: fx-serum 1.7s ease-in-out forwards; }
+.fx-serum { transform-box: fill-box; transform-origin: 100% 50%; animation: fx-serum 2.2s ease-in-out forwards; }
 
 @keyframes fx-heal {
-  0%, 40% { transform: scale(0.9); opacity: 0; }
-  50% { opacity: 1; }
+  0%, 55% { transform: scale(0.9); opacity: 0; }
+  62% { opacity: 1; }
   100% { transform: scale(1.9); opacity: 0; }
 }
-.fx-heal { animation: fx-heal 1.7s ease-out forwards; }
+.fx-heal { animation: fx-heal 2.2s ease-out forwards; }
 .fx-heal-2 { animation-delay: 0.18s; opacity: 0; }
 
 @keyframes fx-sparkle {
@@ -122,5 +115,5 @@ body {
 .fx-shock { animation: fx-shock 0.7s ease-out forwards; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fx-rip, .fx-dust, .fx-syringe, .fx-plunger, .fx-serum, .fx-heal, .fx-sparkle, .fx-shock { animation-duration: 0.01s; }
+  .fx-rip, .fx-dust, .fx-plunger, .fx-serum, .fx-heal, .fx-sparkle, .fx-shock { animation-duration: 0.01s; }
 }

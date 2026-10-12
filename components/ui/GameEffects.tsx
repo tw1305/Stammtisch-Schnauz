@@ -6,15 +6,23 @@ import { getFireSprites, FIRE_SPRITE_STEPS } from './fireSprites'
 
 /** A short one-shot animation anchored on a player at the table. */
 export type EffectKind = 'rip' | 'revive' | 'fire'
-export type GameEffect = { id: number; kind: EffectKind; playerId: string }
+export type GameEffect = {
+  id: number
+  kind: EffectKind
+  playerId: string
+  /** revive: who gave the revive — the syringe flies from their seat */
+  fromPlayerId?: string
+  /** revive: keep the target greyed out until the syringe has injected */
+  holdGray?: boolean
+}
 
 /** How long each effect stays mounted (ms) — matches the CSS animation lengths. */
-export const EFFECT_DURATION: Record<EffectKind, number> = { rip: 1900, revive: 1700, fire: 1600 }
+export const EFFECT_DURATION: Record<EffectKind, number> = { rip: 1900, revive: 2300, fire: 1600 }
 
 /** Renders one effect centred on an avatar of the given size. */
 export function PlayerEffect({ kind, size }: { kind: EffectKind; size: number }) {
   if (kind === 'rip') return <Tombstone size={size} />
-  if (kind === 'revive') return <ReviveSyringe size={size} />
+  if (kind === 'revive') return <HealPulse size={size} />
   return <FireExplosion size={size} />
 }
 
@@ -78,21 +86,18 @@ function Tombstone({ size }: { size: number }) {
   )
 }
 
-// ---------- Revive syringe ----------
+// ---------- Revive: heal pulse on the revived player ----------
 
-function ReviveSyringe({ size }: { size: number }) {
-  const w = size * 1.5
+function HealPulse({ size }: { size: number }) {
   return (
     <div
       className="absolute left-1/2 top-1/2 pointer-events-none"
       style={{ width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2 }}
       aria-hidden="true"
     >
-      {/* Healing pulse: green glow rings spreading out as the dose goes in */}
+      {/* Green glow rings spreading out once the dose is in */}
       <span className="fx-heal absolute inset-0 rounded-full" style={{ boxShadow: '0 0 0 4px rgba(46,190,110,0.85), 0 0 30px 10px rgba(46,190,110,0.55)' }} />
       <span className="fx-heal fx-heal-2 absolute inset-0 rounded-full" style={{ boxShadow: '0 0 0 3px rgba(120,230,160,0.8)' }} />
-
-      {/* Sparkles */}
       {[0, 1, 2, 3, 4, 5].map(i => (
         <span
           key={i}
@@ -103,26 +108,70 @@ function ReviveSyringe({ size }: { size: number }) {
             color: i % 2 ? '#2EBE6E' : '#FFFFFF',
             fontSize: size * (i % 2 ? 0.2 : 0.16),
             textShadow: '0 0 6px rgba(46,190,110,0.9)',
-            animationDelay: `${0.75 + i * 0.07}s`,
+            animationDelay: `${1.3 + i * 0.07}s`,
           }}
         >
           {i % 2 ? '+' : '✦'}
         </span>
       ))}
+    </div>
+  )
+}
 
-      {/* Syringe flies in from the top right and injects */}
-      <div
-        className="fx-syringe absolute"
-        style={{ width: w, height: w / 3, left: size * 0.2, top: size * -0.28 }}
-      >
-        <svg viewBox="0 0 120 40" className="w-full h-full overflow-visible drop-shadow-md" style={{ transform: 'rotate(140deg)' }}>
+// ---------- Revive: syringe flying from the reviver to the revived ----------
+
+type Pt = { left: number; top: number } // % of the table container
+
+/**
+ * Syringe that starts at the reviver's seat, flies across the table, injects
+ * the revived player and pulls back. Rendered by GameTable in table coordinates.
+ */
+export function SyringeFlight({ from, to, avatar }: { from: Pt; to: Pt; avatar: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const L = Math.max(64, avatar * 1.35) // syringe length in px
+
+  useEffect(() => {
+    const el = ref.current
+    const box = el?.parentElement?.getBoundingClientRect()
+    if (!el || !box) return
+    const fx = (from.left / 100) * box.width
+    const fy = (from.top / 100) * box.height
+    const tx = (to.left / 100) * box.width
+    const ty = (to.top / 100) * box.height
+    const dist = Math.hypot(tx - fx, ty - fy) || 1
+    const ux = (tx - fx) / dist
+    const uy = (ty - fy) / dist
+    const deg = (Math.atan2(uy, ux) * 180) / Math.PI
+    const r = avatar / 2
+    // The element's origin is the needle tip.
+    const start = { x: fx + ux * (r + L * 0.9), y: fy + uy * (r + L * 0.9) }
+    const end = { x: tx - ux * r * 0.55, y: ty - uy * r * 0.55 }
+    const back = { x: end.x - ux * 26, y: end.y - uy * 26 }
+    const at = (p: { x: number; y: number }, s = 1) => `translate(${p.x}px, ${p.y}px) rotate(${deg}deg) scale(${s})`
+    const anim = el.animate(
+      [
+        { transform: at(start, 0.5), opacity: 0, offset: 0, easing: 'ease-out' },
+        { transform: at(start, 1), opacity: 1, offset: 0.12, easing: 'ease-in-out' },
+        { transform: at(end), opacity: 1, offset: 0.45, easing: 'ease-out' },
+        { transform: at(end), opacity: 1, offset: 0.75, easing: 'ease-in' },
+        { transform: at(back), opacity: 0, offset: 1 },
+      ],
+      { duration: 2200, fill: 'forwards' }
+    )
+    return () => anim.cancel()
+  }, [from.left, from.top, to.left, to.top, avatar, L])
+
+  return (
+    <div ref={ref} className="absolute left-0 top-0 pointer-events-none z-50" style={{ opacity: 0 }} aria-hidden="true">
+      <div className="absolute" style={{ width: L, height: L / 3, left: -L * 1.017, top: -L / 6 }}>
+        <svg viewBox="0 0 120 40" className="w-full h-full overflow-visible drop-shadow-md">
           <defs>
             <linearGradient id="fx-glass" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
               <stop offset="1" stopColor="#D8E6EE" stopOpacity="0.85" />
             </linearGradient>
           </defs>
-          {/* Plunger rod + thumb rest (slides right while injecting) */}
+          {/* Plunger rod + thumb rest (slides towards the needle while injecting) */}
           <g className="fx-plunger">
             <rect x="4" y="17" width="34" height="6" rx="1.5" fill="#9AA7B0" />
             <rect x="2" y="9" width="5" height="22" rx="2" fill="#6F7E88" />
