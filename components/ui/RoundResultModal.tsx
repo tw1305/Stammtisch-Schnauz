@@ -22,7 +22,7 @@ type Props = {
   onUndo?: () => void
   /** Won the session's first round: blood oozes out behind the portrait. */
   firstBlood?: boolean
-  /** Won above the standard stake: lightning storm (lib/effects stormFor). */
+  /** Won with a stake of 3 € or more: lightning storm, stronger with the stake (lib/effects stormFor). */
   storm?: StormLevel | null
 }
 

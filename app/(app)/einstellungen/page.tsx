@@ -205,7 +205,7 @@ export default function EinstellungenPage() {
         <div className="bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl overflow-hidden">
           <Toggle
             title="Animationen"
-            desc="Grabstein, Spritze, Feuerexplosion, Münzregen, Feuerring, Blut, Blitze, Goldhaufen & Noob-Schild"
+            desc="Grabstein, Spritze, Feuerexplosion, Münzregen, Feuerring, Blut, Blitze & Noob-Schild"
             on={animOn}
             onToggle={toggleAnimations}
           />
@@ -225,7 +225,7 @@ export default function EinstellungenPage() {
                 Testdaten liegen nur auf diesem Gerät. Statistik und Seasons zeigen im Testmodus nur Testdaten.
                 Spieler und Regeln sind weiterhin die echten.
               </p>
-              {animOn && <EffectPreview standardStake={defaultStake} />}
+              {animOn && <EffectPreview />}
               <button
                 onClick={resetTest}
                 className="w-full h-10 rounded-xl bg-[#FFFDF7] border border-[#E4D9BF] text-[#C8443B] text-sm font-medium"

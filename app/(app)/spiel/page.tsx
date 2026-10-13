@@ -408,7 +408,6 @@ export default function SpielPage() {
             dealerId={dealerId}
             winStreaks={winStreaks}
             effects={effects}
-            pot={activeRound.stake * activeRound.player_count}
             noobSigns={noobSigns}
           />
         </div>
@@ -597,7 +596,7 @@ export default function SpielPage() {
           }}
           onEndSession={handleEndSessionFromResult}
           firstBlood={completedRound.firstBlood}
-          storm={stormFor(completedRound.round.stake, defaultStake)}
+          storm={stormFor(completedRound.round.stake)}
         />
       )}
 

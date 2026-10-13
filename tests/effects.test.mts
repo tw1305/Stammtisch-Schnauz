@@ -5,8 +5,6 @@ import {
   isFirstBlood,
   computeNoobStreaks,
   noobSigns,
-  potTierIndex,
-  POT_TIERS,
   stormFor,
   softenStorm,
   STORM_LEVELS,
@@ -111,55 +109,41 @@ test('Noob signs: a new session (no rounds) starts clean', () => {
   assert.deepEqual(noobSigns([], false), { shown: [], entering: [], leaving: [] })
 })
 
-// ---------- Gold pile ----------
-
-test('Gold pile: tiers grow with the possible winnings and are capped', () => {
-  assert.equal(potTierIndex(0), 0)
-  assert.equal(potTierIndex(5), 0)
-  assert.equal(potTierIndex(9), 1) // 3 players × 3 €
-  assert.equal(potTierIndex(12), 2)
-  assert.equal(potTierIndex(10000), POT_TIERS.length - 1)
-  for (let i = 1; i < POT_TIERS.length; i++) {
-    assert.ok(POT_TIERS[i].min > POT_TIERS[i - 1].min)
-    assert.ok(POT_TIERS[i].width > POT_TIERS[i - 1].width)
-    assert.ok(POT_TIERS[i].coins > POT_TIERS[i - 1].coins)
-  }
-})
-
 // ---------- Stake → storm ----------
 
-test('Storm: nothing at or below the standard stake', () => {
-  assert.equal(stormFor(3, 3), null)
-  assert.equal(stormFor(2, 3), null)
-  assert.equal(stormFor(5, 0), null)
+test('Storm: nothing below 3 €', () => {
+  assert.equal(stormFor(0), null)
+  assert.equal(stormFor(2), null)
 })
 
-test('Storm: intensity grows with the stake (3 € standard)', () => {
-  assert.equal(stormFor(4, 3)?.bolts, 1) // just above standard
-  assert.equal(stormFor(6, 3)?.bolts, 2)
-  assert.equal(stormFor(9, 3)?.bolts, 3)
-  const mid = stormFor(12, 3)!
-  assert.ok(mid.flicker && mid.darken >= 0.5 && mid.bolts > 3)
-  const storm = stormFor(18, 3)!
-  assert.ok(storm.rain > 0 && storm.shake > 0 && storm.bolts >= 10)
-  assert.equal(stormFor(21, 3), storm)
-  assert.equal(stormFor(100, 3), storm)
+test('Storm: one level per stake step 3, 6, 9, 12, 15, 18 €', () => {
+  const steps = [3, 6, 9, 12, 15, 18]
+  assert.equal(STORM_LEVELS.length, steps.length)
+  steps.forEach((stake, i) => assert.equal(stormFor(stake), STORM_LEVELS[i]))
+  // stakes in between keep the level below, above 18 € stays at the top
+  assert.equal(stormFor(5), STORM_LEVELS[0])
+  assert.equal(stormFor(14), STORM_LEVELS[3])
+  assert.equal(stormFor(21), STORM_LEVELS[5])
+  assert.equal(stormFor(100), STORM_LEVELS[5])
 })
 
-test('Storm: levels are monotonic', () => {
+test('Storm: every level is stronger than the one before', () => {
   for (let i = 1; i < STORM_LEVELS.length; i++) {
     const [a, b] = [STORM_LEVELS[i - 1], STORM_LEVELS[i]]
-    assert.ok(b.minRatio > a.minRatio)
-    assert.ok(b.bolts > a.bolts && b.darken > a.darken && b.flash >= a.flash)
+    assert.ok(b.minStake > a.minStake)
+    assert.ok(b.bolts > a.bolts && b.darken > a.darken && b.flash > a.flash && b.durationMs > a.durationMs)
+    assert.ok(b.rain >= a.rain)
   }
 })
 
-test('Storm: relative to the configured standard stake', () => {
-  assert.equal(stormFor(12, 2), stormFor(18, 3)) // 6× standard either way
+test('Storm: only the top level shakes, and only gently', () => {
+  const top = stormFor(18)!
+  assert.ok(top.shake > 0 && top.shake <= 4)
+  assert.ok(STORM_LEVELS.slice(0, -1).every(l => l.shake === 0))
 })
 
 test('Storm: reduced motion keeps the effect but drops shake and flicker', () => {
-  const soft = softenStorm(stormFor(18, 3)!)
+  const soft = softenStorm(stormFor(18)!)
   assert.equal(soft.shake, 0)
   assert.equal(soft.flicker, false)
   assert.ok(soft.flash <= 0.2 && soft.bolts >= 1)

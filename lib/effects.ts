@@ -92,45 +92,11 @@ export function noobSigns(completed: NoobRound[], roundActive: boolean): NoobSig
   }
 }
 
-// ---------- Gold pile (possible winnings) ----------
-
-export type PotTier = {
-  /** Lowest possible winnings (€ = stake × players at the start) for this tier. */
-  min: number
-  coins: number
-  bars: number
-  gems: number
-  crown: boolean
-  /** Pile width as a share of the table scene's width. */
-  width: number
-}
-
-/**
- * Thresholds double from tier to tier (logarithmic), so a few euros already make
- * a decent heap while 200 € tops out as an absurd treasure without breaking the
- * layout. Typical: 3 × 3 € = 9 € → tier 1, 5 × 9 € = 45 € → tier 3, 9 × 21 € → tier 5.
- */
-export const POT_TIERS: PotTier[] = [
-  { min: 0, coins: 10, bars: 0, gems: 0, crown: false, width: 0.2 },
-  { min: 6, coins: 15, bars: 0, gems: 0, crown: false, width: 0.23 },
-  { min: 12, coins: 21, bars: 1, gems: 0, crown: false, width: 0.26 },
-  { min: 24, coins: 30, bars: 2, gems: 1, crown: false, width: 0.29 },
-  { min: 48, coins: 40, bars: 3, gems: 2, crown: false, width: 0.32 },
-  { min: 96, coins: 52, bars: 4, gems: 3, crown: true, width: 0.355 },
-  { min: 192, coins: 66, bars: 6, gems: 4, crown: true, width: 0.39 },
-]
-
-export function potTierIndex(pot: number): number {
-  let i = 0
-  for (let k = 0; k < POT_TIERS.length; k++) if (pot >= POT_TIERS[k].min) i = k
-  return i
-}
-
-// ---------- Storm (round won above the standard stake) ----------
+// ---------- Storm (round won with a stake of 3 € or more) ----------
 
 export type StormLevel = {
-  /** Applies from stake ÷ standard stake ≥ minRatio (level 1: strictly above 1). */
-  minRatio: number
+  /** Applies from this stake (€) upwards. */
+  minStake: number
   /** Lightning strikes over the whole storm. */
   bolts: number
   /** How long strikes keep coming (ms); the first one hits right away. */
@@ -150,28 +116,24 @@ export type StormLevel = {
 }
 
 /**
- * Stake → storm intensity, relative to the configured standard stake (€ values
- * in the comments for the usual 3 € standard). Edit here to retune.
+ * Stake → storm intensity: one level per stake step (3, 6, 9, 12, 15, 18 €).
+ * Stakes in between get the level below, everything above 18 € the top level.
+ * Edit here to retune.
  */
 export const STORM_LEVELS: StormLevel[] = [
-  // just above the standard (e.g. 4–5 €): a single bolt
-  { minRatio: 1, bolts: 1, durationMs: 600, darken: 0.18, flash: 0.25, flicker: false, rain: 0, shake: 0, clouds: false },
-  // Double (6 €)
-  { minRatio: 2, bolts: 2, durationMs: 1800, darken: 0.28, flash: 0.32, flicker: false, rain: 0, shake: 0, clouds: false },
-  // Triple (9 €): 2–3 bolts
-  { minRatio: 3, bolts: 3, durationMs: 2600, darken: 0.4, flash: 0.38, flicker: false, rain: 0, shake: 0, clouds: false },
-  // Quattro / Quinto (12–15 €): more bolts, dark sky, flicker
-  { minRatio: 4, bolts: 6, durationMs: 4500, darken: 0.6, flash: 0.45, flicker: true, rain: 40, shake: 0, clouds: true },
-  // from Sesto (18 €): full thunderstorm
-  { minRatio: 6, bolts: 18, durationMs: 8000, darken: 0.82, flash: 0.55, flicker: true, rain: 130, shake: 6, clouds: true },
+  { minStake: 3, bolts: 1, durationMs: 600, darken: 0.15, flash: 0.22, flicker: false, rain: 0, shake: 0, clouds: false },
+  { minStake: 6, bolts: 2, durationMs: 1600, darken: 0.25, flash: 0.3, flicker: false, rain: 0, shake: 0, clouds: false },
+  { minStake: 9, bolts: 3, durationMs: 2600, darken: 0.38, flash: 0.36, flicker: false, rain: 0, shake: 0, clouds: false },
+  { minStake: 12, bolts: 5, durationMs: 4000, darken: 0.52, flash: 0.42, flicker: true, rain: 30, shake: 0, clouds: true },
+  { minStake: 15, bolts: 9, durationMs: 6000, darken: 0.68, flash: 0.48, flicker: true, rain: 75, shake: 0, clouds: true },
+  // full thunderstorm; the shake stays gentle so the card remains readable
+  { minStake: 18, bolts: 18, durationMs: 8000, darken: 0.82, flash: 0.55, flicker: true, rain: 130, shake: 3.5, clouds: true },
 ]
 
-/** Storm for a won round, or null at/below the standard stake (unchanged result screen). */
-export function stormFor(stake: number, standardStake: number): StormLevel | null {
-  if (!(standardStake > 0) || !(stake > standardStake)) return null
-  const ratio = stake / standardStake
+/** Storm for a won round's stake, or null below the first level (unchanged result screen). */
+export function stormFor(stake: number): StormLevel | null {
   let level: StormLevel | null = null
-  for (const l of STORM_LEVELS) if (ratio >= l.minRatio) level = l // ratio > 1 is guaranteed above
+  for (const l of STORM_LEVELS) if (stake >= l.minStake) level = l
   return level
 }
 
