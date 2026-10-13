@@ -15,7 +15,7 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import { computeSessionSummary, computePlayerTotals, fetchByIds, loadPlayers, loadPlayerMap, clearStatsCache, type TableTotals } from '@/lib/stats'
+import { computeSessionSummary, computePlayerTotals, fetchByIds, loadPlayers, loadPlayerMap, clearStatsCache, PLAYERS_UPDATED, type TableTotals } from '@/lib/stats'
 import {
   feedbackEliminate,
   feedbackRevive,
@@ -39,6 +39,26 @@ const STAKE_OPTIONS = [
 ]
 
 const DEFAULT_PLAYERS = ['Domi', 'Tom', 'André']
+
+/** Last known season balances on this device: the table shows them at once instead of "0 €". */
+const BALANCES_STORE = 'schnauz_balances_v1'
+
+function readStoredBalances(seasonId: string): Record<string, number> | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(BALANCES_STORE) || 'null')
+    return v && v.seasonId === seasonId ? (v.balances as Record<string, number>) : null
+  } catch {
+    return null
+  }
+}
+
+function storeBalances(seasonId: string, balances: Record<string, number>) {
+  try {
+    localStorage.setItem(BALANCES_STORE, JSON.stringify({ seasonId, balances }))
+  } catch {
+    /* storage unavailable — balances simply load from the network next time */
+  }
+}
 
 export default function SpielPage() {
   const router = useRouter()
@@ -99,6 +119,10 @@ export default function SpielPage() {
   useEffect(() => {
     loadMeta()
     initFeedback() // unlock audio on the first tap so later sounds are audible
+    // Players changed in the background (name, avatar, new player): update the picker.
+    const onPlayers = (e: Event) => setAllPlayers((e as CustomEvent<Player[]>).detail.filter(p => p.is_active))
+    window.addEventListener(PLAYERS_UPDATED, onPlayers)
+    return () => window.removeEventListener(PLAYERS_UPDATED, onPlayers)
   }, [])
 
   /** Shows a one-shot animation on a player's seat (if animations are enabled). */
@@ -181,7 +205,11 @@ export default function SpielPage() {
         supabase.from('seasons').select('*').eq('status', 'active').limit(1),
         loadPlayers(supabase).catch(() => []), // shared cache: avatars are loaded once, not per screen
       ])
-      setActiveSeason(seasons?.[0] ?? null)
+      const season = seasons?.[0] ?? null
+      setActiveSeason(season)
+      // Same render as the first table: last known balances instead of a flash of "0 €".
+      const known = season ? readStoredBalances(season.id) : null
+      if (known) setSessionBalances(known)
 
       const players = all.filter(p => p.is_active)
       setAllPlayers(players)
@@ -226,6 +254,7 @@ export default function SpielPage() {
       }
     }
     setSessionBalances(balances)
+    storeBalances(activeSeason.id, balances)
   }
 
   const effectiveStake = showCustomInput

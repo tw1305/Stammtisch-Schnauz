@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Session, SessionPlayer, Round, RoundPlayer, RoundFire } from '@/types/database'
 import { calculateBalances } from '@/lib/game-logic'
 import { isFirstBlood } from '@/lib/effects'
-import { loadPlayerMap, clearStatsCache } from '@/lib/stats'
+import { loadPlayerMap, loadPlayers, PLAYERS_UPDATED } from '@/lib/stats'
 
 type Supa = ReturnType<typeof createClient>
 
@@ -18,8 +18,7 @@ type Supa = ReturnType<typeof createClient>
 async function withPlayers<T extends { player_id: string }>(supabase: Supa, rows: T[]): Promise<T[]> {
   let players = await loadPlayerMap(supabase)
   if (rows.some(r => !players.has(r.player_id))) {
-    clearStatsCache()
-    players = await loadPlayerMap(supabase)
+    players = new Map((await loadPlayers(supabase, { fresh: true })).map(p => [p.id, p]))
   }
   return rows.map(r => ({ ...r, player: players.get(r.player_id) }))
 }
@@ -130,6 +129,8 @@ export function useSession() {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, trigger)
     }
     channel.subscribe()
+    // Changed names/avatars arrived in the background: redraw the table with them.
+    window.addEventListener(PLAYERS_UPDATED, trigger)
     // Separate channel so a missing round_fires migration can't break the main sync.
     const firesChannel = supabase
       .channel('schnauz-sync-fires')
@@ -137,6 +138,7 @@ export function useSession() {
       .subscribe()
     return () => {
       if (timer) clearTimeout(timer)
+      window.removeEventListener(PLAYERS_UPDATED, trigger)
       supabase.removeChannel(channel)
       supabase.removeChannel(firesChannel)
     }

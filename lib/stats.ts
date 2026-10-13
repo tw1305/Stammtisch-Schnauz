@@ -81,25 +81,84 @@ function memo<T>(supabase: Supa, key: string, fn: () => Promise<T>, ttl = MEMO_M
   return p
 }
 
+function memoSet<T>(supabase: Supa, key: string, p: Promise<T>) {
+  let store = memoStore.get(supabase)
+  if (!store) memoStore.set(supabase, (store = new Map()))
+  store.set(key, { at: Date.now(), p })
+}
+
 /** Drops all cached query results (call after changing players or game data). */
 export function clearStatsCache() {
   memoStore = new WeakMap()
 }
 
+// ---------- Players (kept on the device) ----------
+
+/** The player list incl. avatars, stored on the device so screens open instantly. */
+const PLAYERS_STORE = 'schnauz_players_v1'
+/** Fired on window (detail: Player[]) when a background refresh found changed players. */
+export const PLAYERS_UPDATED = 'schnauz:players-updated'
+
+function readStoredPlayers(): { rows: Player[]; raw: string } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(PLAYERS_STORE)
+    return raw ? { rows: JSON.parse(raw) as Player[], raw } : null
+  } catch {
+    return null
+  }
+}
+
+/** The player list last stored on this device (instant, may be slightly stale), or null. */
+export function storedPlayers(): Player[] | null {
+  return readStoredPlayers()?.rows ?? null
+}
+
+async function fetchPlayers(supabase: Supa): Promise<{ rows: Player[]; raw: string }> {
+  const { data, error } = await supabase.from('players').select('*').order('name')
+  if (error) throw error
+  const rows = (data || []) as Player[]
+  const raw = JSON.stringify(rows)
+  try {
+    localStorage.setItem(PLAYERS_STORE, raw)
+  } catch {
+    /* storage full/unavailable — the network copy still works */
+  }
+  return { rows, raw }
+}
+
 /**
- * All players incl. their avatars, loaded once and shared for 5 minutes (the
- * Spieler page clears the cache whenever players are edited).
- * Avatars are base64 images (~50 KB each), so they must never be joined into
- * per-round rows — look players up here instead.
+ * All players incl. their avatars. Avatars are base64 images (~60 KB each), so
+ * they must never be joined into per-round rows — look players up here instead.
+ *
+ * Stale-while-revalidate: the copy stored on the device is returned right away
+ * (no 700 KB download before a screen can show), while a fresh list loads in
+ * the background; if it differs, PLAYERS_UPDATED is fired so open screens can
+ * refresh. Shared in memory for 5 minutes. `fresh: true` waits for the network
+ * (after editing players, or when a player is missing from the stored copy).
  */
-export function loadPlayers(supabase: Supa): Promise<Player[]> {
+export function loadPlayers(supabase: Supa, opts: { fresh?: boolean } = {}): Promise<Player[]> {
+  if (opts.fresh) {
+    const p = fetchPlayers(supabase).then(r => r.rows)
+    memoSet(supabase, 'players', p)
+    return p
+  }
   return memo(
     supabase,
     'players',
     async () => {
-      const { data, error } = await supabase.from('players').select('*').order('name')
-      if (error) throw error
-      return (data || []) as Player[]
+      const stored = readStoredPlayers()
+      const net = fetchPlayers(supabase)
+      if (!stored) return (await net).rows
+      net
+        .then(fresh => {
+          memoSet(supabase, 'players', Promise.resolve(fresh.rows))
+          if (fresh.raw !== stored.raw && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent(PLAYERS_UPDATED, { detail: fresh.rows }))
+          }
+        })
+        .catch(() => {})
+      return stored.rows
     },
     5 * 60_000
   )

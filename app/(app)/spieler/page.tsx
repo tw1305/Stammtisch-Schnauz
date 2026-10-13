@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
 import AvatarCropper from '@/components/ui/AvatarCropper'
 import { formatBirthday, normalizeBirthday, maskBirthdayInput } from '@/lib/birthday'
-import { clearStatsCache } from '@/lib/stats'
+import { clearStatsCache, loadPlayers as loadPlayerList, storedPlayers } from '@/lib/stats'
 import type { Player } from '@/types/database'
 
 function readFile(file: File): Promise<string> {
@@ -25,21 +25,41 @@ export default function SpielerPage() {
   const [newPlayerName, setNewPlayerName] = useState('')
   const [editing, setEditing] = useState<Player | null>(null)
 
-  useEffect(() => { loadPlayers() }, [])
-
+  /** Current list from the database (also refreshes the copy stored on the device). */
   async function loadPlayers() {
-    clearStatsCache() // names/avatars may just have changed
-    const { data } = await supabase.from('players').select('*').order('name')
-    setPlayers(data || [])
-    setLoading(false)
+    try {
+      setPlayers(await loadPlayerList(supabase, { fresh: true }))
+    } finally {
+      setLoading(false)
+    }
   }
+
+  /** After a change: statistics recompute, everyone gets the new list. */
+  function reloadAfterChange() {
+    clearStatsCache()
+    loadPlayers()
+  }
+
+  // The list stored on the device shows before the first paint (no "Laden…", and
+  // client-only, so server and client render match); the current list follows.
+  useLayoutEffect(() => {
+    const stored = storedPlayers()
+    if (stored) {
+      setPlayers(stored) // eslint-disable-line react-hooks/set-state-in-effect
+      setLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    loadPlayers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function addPlayer() {
     const name = newPlayerName.trim()
     if (!name) return
     await supabase.from('players').insert({ name })
     setNewPlayerName('')
-    loadPlayers()
+    reloadAfterChange()
   }
 
   if (loading) {
@@ -103,7 +123,7 @@ export default function SpielerPage() {
         <PlayerEditor
           player={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); loadPlayers() }}
+          onSaved={() => { setEditing(null); reloadAfterChange() }}
         />
       )}
     </div>
