@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Session, SessionPlayer, Round, RoundPlayer, RoundFire } from '@/types/database'
 import { calculateBalances } from '@/lib/game-logic'
+import { isFirstBlood } from '@/lib/effects'
 
 type UndoAction =
   | { kind: 'eliminate'; rpId: string; prevWasFirst: boolean }
@@ -26,6 +27,8 @@ export function useSession() {
     winnerId: string
     reactivatePlayerId: string
     prevDealerId: string | null
+    /** Winner of the session's first round: blood + "First Blood" call before the music. */
+    firstBlood: boolean
   } | null>(null)
 
   const loadActiveSession = useCallback(async () => {
@@ -419,6 +422,11 @@ export function useSession() {
       .from('round_players')
       .select('*, player:players(*)')
       .eq('round_id', activeRound.id)
+    const { data: sessionRounds } = await supabase
+      .from('rounds')
+      .select('id, round_number, status')
+      .eq('session_id', activeRound.session_id)
+    const firstBlood = isFirstBlood(sessionRounds || [], activeRound.id)
 
     setCompletedRound({
       round: { ...activeRound, status: 'completed', winner_id: winnerId },
@@ -426,6 +434,7 @@ export function useSession() {
       winnerId,
       reactivatePlayerId: lastEliminatedId,
       prevDealerId,
+      firstBlood,
     })
     setUndoStack([])
     setActiveRound(null)

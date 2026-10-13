@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from './PlayerAvatar'
 import { PlayerEffect, SyringeFlight, type GameEffect } from './GameEffects'
+import { GoldPile, goldPileAspect, NoobSign, type NoobSignState } from './RoundEffects'
+import { POT_TIERS, potTierIndex } from '@/lib/effects'
 import type { SessionPlayer, RoundPlayer } from '@/types/database'
 
 type GameTableProps = {
@@ -17,6 +19,10 @@ type GameTableProps = {
   winStreaks?: Map<string, number>
   /** One-shot animations (R.I.P., revive, fire) anchored on a player */
   effects?: GameEffect[]
+  /** Possible winnings of the running round (stake × players): the gold pile on the table. */
+  pot?: number
+  /** "Noob" signs above portraits (repeatedly first out). */
+  noobSigns?: Map<string, NoobSignState>
 }
 
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
@@ -88,6 +94,8 @@ const SEAT_CENTER_Y = 0.61 // vertical centre of the stump ring in the image
 const PLATE_H = 36 // name plate height (px at scale 1) below the avatar
 /** Largest side of the setup (between rounds) table. */
 const SETUP_MAX = 380
+/** Where the gold pile stands: bottom centre on the table top, in % of the scene image. */
+const PILE_ANCHOR = { left: 50.5, top: 66 }
 
 type ActiveLayout = {
   img: { left: number; top: number; w: number; h: number }
@@ -143,6 +151,8 @@ export default function GameTable({
   dealerId = null,
   winStreaks,
   effects = [],
+  pot,
+  noobSigns,
 }: GameTableProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 0, h: 0 })
@@ -206,6 +216,24 @@ export default function GameTable({
   const side = !isRoundActive ? Math.min(box.w, box.h, SETUP_MAX) : 0
   const tokenScale = layout?.scale ?? (side > 0 ? Math.min(1.1, Math.max(0.5, side / REF_WIDTH)) : 1)
   const avatarPx = Math.round(avatar * tokenScale)
+
+  // Gold pile: sized by tier, but never taller than the gap up to the token
+  // sitting behind the table (its name plate), so it can't hide a player.
+  let pile: { left: number; top: number; width: number; tier: number } | null = null
+  if (layout && pot != null && pot > 0) {
+    const tier = potTierIndex(pot)
+    const left = layout.img.left + (PILE_ANCHOR.left / 100) * layout.img.w
+    const top = layout.img.top + (PILE_ANCHOR.top / 100) * layout.img.h
+    let width = POT_TIERS[tier].width * layout.img.w
+    for (const p of positions) {
+      const x = (p.left / 100) * box.w
+      const y = (p.top / 100) * box.h
+      if (y >= top || Math.abs(x - left) > width / 2 + avatarPx / 2) continue
+      const tokenBottom = y + avatarPx / 2 + (PLATE_H - 10) * tokenScale
+      width = Math.min(width, Math.max(0, top - tokenBottom - 4) / goldPileAspect(tier))
+    }
+    if (width >= 24) pile = { left, top, width, tier }
+  }
 
   function playerEffectsFor(playerId: string) {
     return effects.filter(e => e.playerId === playerId)
@@ -283,6 +311,13 @@ export default function GameTable({
         </div>
       )}
 
+      {/* Possible winnings as a treasure heap on the table (under the players, never tappable) */}
+      {pile && (
+        <div className="absolute pointer-events-none" style={{ left: pile.left - pile.width / 2, top: pile.top - pile.width * goldPileAspect(pile.tier) }}>
+          <GoldPile tier={pile.tier} width={pile.width} label={`Möglicher Gewinn: ${pot} €`} />
+        </div>
+      )}
+
       {/* Players (active round: only once the box is measured, so nothing jumps) */}
       {(!isRoundActive || layout) && sessionPlayers.map((sp, i) => {
         const pos = positions[i]
@@ -318,6 +353,7 @@ export default function GameTable({
                 winStreak={winStreaks?.get(sp.player_id) ?? 0}
               />
               </div>
+              {noobSigns?.has(sp.player_id) && <NoobSign size={avatarPx} state={noobSigns.get(sp.player_id)!} />}
               {dealerId === sp.player_id && (
                 <span
                   className="absolute -top-1 -left-1 bg-[#2E6B3A] text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow ring-2 ring-[#F4ECDA]"

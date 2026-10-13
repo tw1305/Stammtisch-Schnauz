@@ -45,6 +45,9 @@ export const vibrationSupported = () =>
 export const vibrationEnabled = () => vibrationSupported() && readFlag(VIB_KEY)
 export const setVibrationEnabled = (on: boolean) => writeFlag(VIB_KEY, on)
 export const animationsEnabled = () => readFlag(ANIM_KEY)
+/** The device asks for reduced motion: effects stay, but calmer (no shake, less flicker). */
+export const reducedMotion = () =>
+  typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 export const setAnimationsEnabled = (on: boolean) => {
   writeFlag(ANIM_KEY, on)
   applyAnimationPref()
@@ -239,9 +242,16 @@ const WIN_FILES = [
   '/sounds/win/i-get-money.mp3', // 50 Cent – I Get Money
 ]
 
+/** First round of a session won: Counter-Strike "First Blood" call (~3 s) before the song. */
+const FIRST_BLOOD_FILE = '/sounds/first-blood.mp3'
+/** If the call isn't decoded by then, the song starts without it. */
+const FIRST_BLOOD_WAIT_MS = 1500
+
 const sampleCache = new Map<string, Promise<AudioBuffer | null>>()
 let sampleOut: GainNode | null = null
 let winSource: AudioBufferSourceNode | null = null
+let introSource: AudioBufferSourceNode | null = null
+let winToken = 0
 let preloaded = false
 
 function loadSample(url: string): Promise<AudioBuffer | null> {
@@ -266,7 +276,7 @@ function loadSample(url: string): Promise<AudioBuffer | null> {
 function preloadSounds() {
   if (preloaded) return
   preloaded = true
-  for (const url of [...FART_FILES, FIRE_FILE, FEUERBALL_FILE, MEDIC_FILE]) void loadSample(url)
+  for (const url of [...FART_FILES, FIRE_FILE, FEUERBALL_FILE, MEDIC_FILE, FIRST_BLOOD_FILE]) void loadSample(url)
   // Win songs are bigger: only the one that plays next is fetched and decoded ahead.
   pickNextWin()
 }
@@ -640,25 +650,60 @@ function pickNextWin() {
   void loadSample(WIN_FILES[i])
 }
 
-/** Round won: a random victory song. */
-export function feedbackWinner() {
-  vib([70, 50, 70, 50, 70, 50, 70, 50, 320])
-  if (!soundEnabled()) return
-  // A new win cuts off a still-playing previous one instead of overlapping it.
+/**
+ * Plays the First Blood call now. Resolves to the AudioContext time at which it
+ * ends, or null if it couldn't be loaded in time (then the song just starts).
+ */
+async function playFirstBlood(): Promise<number | null> {
+  const a = audio()
+  if (!a) return null
+  const buf = await Promise.race([
+    loadSample(FIRST_BLOOD_FILE),
+    new Promise<null>(res => setTimeout(() => res(null), FIRST_BLOOD_WAIT_MS)),
+  ])
+  if (!buf) return null
+  const src = await playSample(FIRST_BLOOD_FILE, 1)
+  if (!src) return null
+  introSource = src
+  return a.ctx.currentTime + buf.duration
+}
+
+function stopSource(src: AudioBufferSourceNode | null) {
   try {
-    winSource?.stop()
+    src?.stop()
   } catch {
     /* already stopped */
   }
-  winSource = null
+}
+
+/** Round won: a random victory song — after the "First Blood" call for a session's first round. */
+export function feedbackWinner(opts: { firstBlood?: boolean } = {}) {
+  vib([70, 50, 70, 50, 70, 50, 70, 50, 320])
+  if (!soundEnabled()) return
+  // A new win cuts off a still-playing previous one instead of overlapping it.
+  stopSource(winSource)
+  stopSource(introSource)
+  winSource = introSource = null
+  const token = ++winToken
   if (nextWin < 0) pickNextWin()
   const url = WIN_FILES[nextWin]
   lastWin = nextWin
-  void playSample(url, 0.85).then(src => {
+  void (async () => {
+    const introEnd = opts.firstBlood ? await playFirstBlood() : null
+    if (token !== winToken) return // a newer win took over meanwhile
+    // Make sure the song is decoded before scheduling it right at the end of the call.
+    await loadSample(url)
+    const a = audio()
+    const delay = introEnd != null && a ? Math.max(0, introEnd - a.ctx.currentTime) : 0
+    const src = await playSample(url, 0.85, delay)
+    if (token !== winToken) {
+      stopSource(src)
+      return
+    }
     if (src) winSource = src
     else synthCoins()
     sampleCache.delete(url) // the playing source keeps its buffer; don't hoard decoded songs
-  })
+  })()
   pickNextWin()
 }
 

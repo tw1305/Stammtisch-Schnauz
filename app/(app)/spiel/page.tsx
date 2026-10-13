@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
+import { useNoobSigns } from '@/hooks/useNoobSigns'
+import { stormFor } from '@/lib/effects'
 import GameTable from '@/components/ui/GameTable'
 import { NAV_HEIGHT } from '@/components/ui/BottomNav'
 import { TEST_BANNER_HEIGHT, useTestMode } from '@/components/ui/TestModeBanner'
@@ -85,6 +87,8 @@ export default function SpielPage() {
   const [coinRain, setCoinRain] = useState(false)
   const effectId = useRef(0)
   const testMode = useTestMode()
+  // Noob signs: change (drop in / topple away) only when a round starts.
+  const noobSigns = useNoobSigns(session?.id ?? null, activeRound?.id ?? null, completedRound?.round.id)
 
   useEffect(() => {
     loadMeta()
@@ -128,10 +132,10 @@ export default function SpielPage() {
     if (activeSeason) loadSeasonBalances()
   }, [activeSeason, session, completedRound, roundPlayers])
 
-  // Winner feedback when a round completes: coin sound + coin rain
+  // Winner feedback when a round completes: ("First Blood" call +) victory song + coin rain
   useEffect(() => {
     if (!completedRound) return
-    feedbackWinner()
+    feedbackWinner({ firstBlood: completedRound.firstBlood })
     if (animationsEnabled()) setCoinRain(true) // eslint-disable-line react-hooks/set-state-in-effect
   }, [completedRound])
 
@@ -404,6 +408,8 @@ export default function SpielPage() {
             dealerId={dealerId}
             winStreaks={winStreaks}
             effects={effects}
+            pot={activeRound.stake * activeRound.player_count}
+            noobSigns={noobSigns}
           />
         </div>
 
@@ -486,6 +492,7 @@ export default function SpielPage() {
           isRoundActive={false}
           dealerId={dealerId}
           winStreaks={winStreaks}
+          noobSigns={noobSigns}
         />
       </div>
 
@@ -589,6 +596,8 @@ export default function SpielPage() {
             setShowPlayerManager(true)
           }}
           onEndSession={handleEndSessionFromResult}
+          firstBlood={completedRound.firstBlood}
+          storm={stormFor(completedRound.round.stake, defaultStake)}
         />
       )}
 

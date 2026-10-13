@@ -1,10 +1,12 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import PlayerAvatar from './PlayerAvatar'
 import GhostBurst, { type GhostWave } from './GhostBurst'
+import { BloodSplash, StormOverlay } from './RoundEffects'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
-import { animationsEnabled } from '@/lib/feedback'
+import { animationsEnabled, reducedMotion } from '@/lib/feedback'
+import { softenStorm, type StormLevel } from '@/lib/effects'
 import { ON_FIRE_STREAK } from '@/lib/stats'
 import type { RoundPlayer } from '@/types/database'
 
@@ -18,6 +20,10 @@ type Props = {
   onManagePlayers: () => void
   onEndSession: () => void
   onUndo?: () => void
+  /** Won the session's first round: blood oozes out behind the portrait. */
+  firstBlood?: boolean
+  /** Won above the standard stake: lightning storm (lib/effects stormFor). */
+  storm?: StormLevel | null
 }
 
 /**
@@ -53,6 +59,8 @@ export default function RoundResultModal({
   onManagePlayers,
   onEndSession,
   onUndo,
+  firstBlood = false,
+  storm = null,
 }: Props) {
   const winner = players.find(p => p.player_id === winnerId)
   const winnerName = winner?.player?.name ?? 'Unbekannt'
@@ -65,6 +73,28 @@ export default function RoundResultModal({
   const [phase, setPhase] = useState<Phase>(animated ? 'award' : 'done')
   const [offset, setOffset] = useState<{ x: number; y: number; s: number } | null>(null)
   const avatarRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const captionRef = useRef<HTMLDivElement>(null)
+  // Storm only with animations on; calmer when the device asks for reduced motion.
+  const [stormLevel] = useState(() => (animated && storm ? (reducedMotion() ? softenStorm(storm) : storm) : null))
+  const dark = !!stormLevel && stormLevel.darken >= 0.5
+
+  // Screen shake on strikes (big storms only): card and caption jolt, the winner stays readable.
+  const shake = useCallback((px: number) => {
+    for (const el of [cardRef.current, captionRef.current]) {
+      el?.animate(
+        [
+          { translate: '0 0' },
+          { translate: `${px}px ${-px * 0.5}px` },
+          { translate: `${-px * 0.8}px ${px * 0.4}px` },
+          { translate: `${px * 0.5}px ${px * 0.3}px` },
+          { translate: `${-px * 0.25}px 0` },
+          { translate: '0 0' },
+        ],
+        { duration: 360, easing: 'ease-out' }
+      )
+    }
+  }, [])
 
   // Measure where the portrait sits in the card, then start it from the screen centre.
   useLayoutEffect(() => {
@@ -101,21 +131,31 @@ export default function RoundResultModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-3 animate-fade-in">
+      {/* Behind everything else: the storm never covers the winner or the amount */}
+      {stormLevel && <StormOverlay level={stormLevel} onStrike={shake} />}
+
       {/* Award caption under the big portrait */}
       {animated && offset && (
         <div
+          ref={captionRef}
           className={`fixed left-0 right-0 text-center pointer-events-none z-[2] transition-opacity duration-300 ${award ? 'opacity-100' : 'opacity-0'}`}
-          style={{ top: window.innerHeight * 0.42 + (AVATAR * offset.s) / 2 + 22 }}
+          style={{
+            top: window.innerHeight * 0.42 + (AVATAR * offset.s) / 2 + 22 + (firstBlood ? AVATAR * offset.s * 0.12 : 0),
+            // Flashes behind the caption: a dark halo keeps the white text readable.
+            textShadow: stormLevel ? '0 2px 10px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9)' : undefined,
+          }}
         >
           <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-white drop-shadow-lg">{winnerName} gewinnt!</p>
+          {firstBlood && <p className="text-[#FF8A8A] font-extrabold uppercase tracking-[0.2em] mt-1 drop-shadow">🩸 First Blood</p>}
           {comeback && <p className="text-[#DCE8FF] font-semibold mt-1 drop-shadow">👻 Aus dem Jenseits!</p>}
           {streakLine && <p className="text-[#FFD86B] font-semibold mt-1 drop-shadow">{streakLine}</p>}
         </div>
       )}
 
       <div
+        ref={cardRef}
         className={`relative w-full max-w-md max-h-[calc(100dvh-1.5rem)] flex flex-col rounded-3xl border transition-[background-color,border-color,box-shadow] duration-500 ${
-          award ? 'bg-transparent border-transparent' : 'bg-[#FBF6EA] border-[#E4D9BF] shadow-2xl'
+          award ? 'bg-transparent border-transparent' : `bg-[#FBF6EA] border-[#E4D9BF] ${dark ? 'shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_20px_60px_rgba(0,0,0,0.7)]' : 'shadow-2xl'}`
         }`}
       >
         {/* Header with the winner's portrait */}
@@ -127,6 +167,8 @@ export default function RoundResultModal({
           <div ref={avatarRef} className="relative mx-auto w-fit z-[1]" style={avatarStyle}>
             <div className={`relative ${animated ? 'award-pop' : ''}`}>
               {/* Behind the portrait (and its ring/flames): ghosts escaping past the rim */}
+              {/* First Blood: blood pooling out from behind the portrait (stays after landing) */}
+              {firstBlood && animated && <BloodSplash size={AVATAR} />}
               {comeback && animated && <GhostBurst size={AVATAR} waves={GHOST_WAVES} />}
               <PlayerAvatar
                 name={winnerName}
@@ -140,10 +182,11 @@ export default function RoundResultModal({
             </div>
           </div>
           <div className={`relative ${fade}`}>
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] mt-4">
+            <h2 className={`font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] ${firstBlood && animated ? 'mt-9' : 'mt-4'}`}>
               🏆 {winnerName} gewinnt!
             </h2>
             <p className="text-[#1F9D57] font-bold text-lg mt-1">{formatBalance(winnerGain)} in dieser Runde</p>
+            {firstBlood && <p className="text-[#A10B18] font-bold text-sm mt-1 tracking-wide">🩸 First Blood – erste Runde der Session</p>}
             {comeback && <p className="text-[#4B5D86] font-semibold text-sm mt-1">👻 Aus dem Jenseits!</p>}
             {streakLine && <p className="text-[#9A6A0C] font-semibold text-sm mt-1">{streakLine}</p>}
           </div>

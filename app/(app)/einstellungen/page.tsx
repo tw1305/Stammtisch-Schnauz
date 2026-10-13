@@ -20,12 +20,14 @@ import {
   feedbackFire,
   feedbackWinner,
 } from '@/lib/feedback'
+import EffectPreview from '@/components/ui/EffectPreview'
 
 const SOUND_TESTS = [
   { label: '🪦 Raus', play: feedbackEliminate },
   { label: '💉 Belebt', play: feedbackRevive },
   { label: '🔥 Feuer', play: feedbackFire },
-  { label: '🪙 Sieg', play: feedbackWinner },
+  { label: '🪙 Sieg', play: () => feedbackWinner() },
+  { label: '🩸 First Blood', play: () => feedbackWinner({ firstBlood: true }) },
 ]
 
 const STAKE_KEY = 'schnauz_default_stake'
@@ -153,7 +155,7 @@ export default function EinstellungenPage() {
           {(soundOn || vibOn) && (
             <div className="px-4 pb-3.5">
               <p className="text-[#7C7461] text-[11px] mb-2">Zum Testen antippen (Sound und Vibration):</p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {SOUND_TESTS.map(t => (
                   <button
                     key={t.label}
@@ -203,7 +205,7 @@ export default function EinstellungenPage() {
         <div className="bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl overflow-hidden">
           <Toggle
             title="Animationen"
-            desc="Grabstein, Spritze, Feuerexplosion, Münzregen & bewegter Feuerring"
+            desc="Grabstein, Spritze, Feuerexplosion, Münzregen, Feuerring, Blut, Blitze, Goldhaufen & Noob-Schild"
             on={animOn}
             onToggle={toggleAnimations}
           />
@@ -223,6 +225,7 @@ export default function EinstellungenPage() {
                 Testdaten liegen nur auf diesem Gerät. Statistik und Seasons zeigen im Testmodus nur Testdaten.
                 Spieler und Regeln sind weiterhin die echten.
               </p>
+              {animOn && <EffectPreview standardStake={defaultStake} />}
               <button
                 onClick={resetTest}
                 className="w-full h-10 rounded-xl bg-[#FFFDF7] border border-[#E4D9BF] text-[#C8443B] text-sm font-medium"
