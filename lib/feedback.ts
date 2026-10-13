@@ -215,8 +215,11 @@ const FIRE_FILE = '/sounds/fire.wav'
 const FEUERBALL_FILE = '/sounds/feuerball.mp3'
 /** Seconds after the explosion starts: overlaps its fading tail a little. */
 const FEUERBALL_DELAY = 1.7
-/** The clip is quietly recorded (peak −20 dBFS): +50 % keeps it well clear of clipping. */
-const FEUERBALL_GAIN = 1.5
+/**
+ * The clip is recorded ~24 dB quieter than the explosion. ×22 with soft clipping
+ * matches it (measured: avg −8.3 vs −8.2 dB, loudest 50 ms −3.9 vs −3.7 dB, no clipping).
+ */
+const FEUERBALL_GAIN = 22
 /** Revive: soldier yelling "MEDIC!" (freesound #800868 by tyranttim), 0.84 s, loud until ~0.6 s. */
 const MEDIC_FILE = '/sounds/medic.wav'
 /** When the syringe (sound + animation) follows the medic call, in ms. */
@@ -271,9 +274,11 @@ function preloadSounds() {
 /**
  * Plays a recorded sound. Resolves to the playing source, or null if the file
  * couldn't be loaded — callers then fall back to the synthesized sound.
- * Recordings bypass the compressor (they are already mastered).
+ * Recordings bypass the compressor (they are already mastered). `softClip`
+ * is for quiet recordings boosted far beyond 0 dBFS: a tanh curve rounds the
+ * peaks off instead of letting them crackle.
  */
-async function playSample(url: string, gain = 0.9, delay = 0): Promise<AudioBufferSourceNode | null> {
+async function playSample(url: string, gain = 0.9, delay = 0, softClip = false): Promise<AudioBufferSourceNode | null> {
   const a = audio()
   if (!a) return null
   const buf = await loadSample(url)
@@ -285,11 +290,33 @@ async function playSample(url: string, gain = 0.9, delay = 0): Promise<AudioBuff
   const src = a.ctx.createBufferSource()
   src.buffer = buf
   const g = a.ctx.createGain()
-  g.gain.value = gain
   src.connect(g)
-  g.connect(sampleOut)
+  if (softClip) {
+    // The shaper's input range is ±1, so pre-scale by the curve's drive.
+    g.gain.value = gain / CLIP_DRIVE
+    const shaper = a.ctx.createWaveShaper()
+    shaper.curve = softClipCurve()
+    shaper.oversample = '4x'
+    g.connect(shaper)
+    shaper.connect(sampleOut)
+  } else {
+    g.gain.value = gain
+    g.connect(sampleOut)
+  }
   src.start(a.ctx.currentTime + delay)
   return src
+}
+
+const CLIP_DRIVE = 4
+let clipCurve: Float32Array<ArrayBuffer> | null = null
+
+/** tanh soft clipper: linear for quiet parts, peaks rounded off just below full scale. */
+function softClipCurve(): Float32Array<ArrayBuffer> {
+  if (!clipCurve) {
+    clipCurve = new Float32Array(2049)
+    for (let i = 0; i < clipCurve.length; i++) clipCurve[i] = 0.95 * Math.tanh(CLIP_DRIVE * (i / 1024 - 1))
+  }
+  return clipCurve
 }
 
 // ---------- Sound building blocks ----------
@@ -483,7 +510,7 @@ export function feedbackFire() {
     if (!src) synthFire()
   })
   // "So ein großer Feuerball, Junge!" — while the explosion dies away (it's loud until ~1.6 s).
-  void playSample(FEUERBALL_FILE, FEUERBALL_GAIN, FEUERBALL_DELAY)
+  void playSample(FEUERBALL_FILE, FEUERBALL_GAIN, FEUERBALL_DELAY, true)
 }
 
 /** Fallback when the recording can't be loaded: ignition whoosh, roaring blaze, crackling embers. */
