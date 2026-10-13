@@ -211,6 +211,10 @@ const FART_FILES = [
 ]
 /** Fire explosion (freesound #186932 by readeonly), trimmed to start at 1.1 s. */
 const FIRE_FILE = '/sounds/fire.wav'
+/** Shouted right after the explosion (user-supplied clip). */
+const FEUERBALL_FILE = '/sounds/feuerball.mp3'
+/** Seconds after the explosion starts: overlaps its fading tail a little. */
+const FEUERBALL_DELAY = 1.7
 /** Round won: one of these clips at random (cut by the user, fade-outs included). */
 const WIN_FILES = [
   '/sounds/win/cant-be-touched.mp3', // Body Head Bangerz – Can't Be Touched
@@ -253,7 +257,7 @@ function loadSample(url: string): Promise<AudioBuffer | null> {
 function preloadSounds() {
   if (preloaded) return
   preloaded = true
-  for (const url of [...FART_FILES, FIRE_FILE]) void loadSample(url)
+  for (const url of [...FART_FILES, FIRE_FILE, FEUERBALL_FILE]) void loadSample(url)
   // Win songs are bigger: only the one that plays next is fetched and decoded ahead.
   pickNextWin()
 }
@@ -263,7 +267,7 @@ function preloadSounds() {
  * couldn't be loaded — callers then fall back to the synthesized sound.
  * Recordings bypass the compressor (they are already mastered).
  */
-async function playSample(url: string, gain = 0.9): Promise<AudioBufferSourceNode | null> {
+async function playSample(url: string, gain = 0.9, delay = 0): Promise<AudioBufferSourceNode | null> {
   const a = audio()
   if (!a) return null
   const buf = await loadSample(url)
@@ -278,7 +282,7 @@ async function playSample(url: string, gain = 0.9): Promise<AudioBufferSourceNod
   g.gain.value = gain
   src.connect(g)
   g.connect(sampleOut)
-  src.start()
+  src.start(a.ctx.currentTime + delay)
   return src
 }
 
@@ -469,6 +473,8 @@ export function feedbackFire() {
   void playSample(FIRE_FILE, 1).then(src => {
     if (!src) synthFire()
   })
+  // "So ein großer Feuerball, Junge!" — while the explosion dies away (it's loud until ~1.6 s).
+  void playSample(FEUERBALL_FILE, 1, FEUERBALL_DELAY)
 }
 
 /** Fallback when the recording can't be loaded: ignition whoosh, roaring blaze, crackling embers. */
