@@ -17,6 +17,14 @@ export type PatchNote = {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: '2.1.0',
+    date: '2026-10-13',
+    title: 'Achterbahn',
+    changes: [
+      { type: 'neu', text: 'Season-Rückblick: neue Karte „Achterbahn“ 🎢 – der tiefe Fall (wer vom höchsten Plus am weitesten ins Minus gestürzt ist) und das Comeback (wer sich vom tiefsten Minus am weitesten nach oben gekämpft hat), jeweils mit Saldo-Verlauf, auf dem die Fahrt eingezeichnet ist.' },
+    ],
+  },
+  {
     version: '2.0.0',
     date: '2026-10-12',
     title: 'Feuer und Flamme (Season 4 Update)',

@@ -21,6 +21,13 @@ export type Leaders = { players: Player[]; value: number }
 
 export type Evening = { player: Player; delta: number; date: string }
 
+/**
+ * A ride on the balance rollercoaster: from `from` (index `fromIdx` of
+ * `history`) to the later `to` (index `toIdx`). `history` is the player's
+ * running season balance, starting at 0 before their first round.
+ */
+export type Swing = { player: Player; from: number; to: number; fromIdx: number; toIdx: number; history: number[] }
+
 export type SeasonWrapped = {
   season: Season
   sessions: number
@@ -48,6 +55,9 @@ export type SeasonWrapped = {
   phoenix: Leaders | null
   comeback: Leaders | null
   biggestRound: { stake: number; winner: Player | null; date: string; players: number } | null
+  /** Biggest fall from a high to a later low, and biggest climb from a low to a later high. */
+  fall: Swing | null
+  rise: Swing | null
   /** Each player's own best evening (only if they finished one in the plus). */
   personalBest: Record<string, { delta: number; date: string }>
   /** Evenings attended per player id. */
@@ -77,6 +87,23 @@ type WRoundPlayer = {
   is_winner: boolean
   reached_final: boolean
   balance_change: number | null
+}
+
+/** Largest move in one direction: dir -1 = high → later low, +1 = low → later high. */
+function biggestSwing(stats: PlayerStats[], dir: 1 | -1): Swing | null {
+  let best: Swing | null = null
+  for (const s of stats) {
+    const h = [0, ...s.balance_history]
+    let extIdx = 0 // running max (fall) / min (rise) so far
+    for (let j = 1; j < h.length; j++) {
+      if (dir === -1 ? h[j] > h[extIdx] : h[j] < h[extIdx]) extIdx = j
+      const move = (h[j] - h[extIdx]) * dir
+      if (move > 0 && (!best || move > (best.to - best.from) * dir)) {
+        best = { player: s.player, from: h[extIdx], to: h[j], fromIdx: extIdx, toIdx: j, history: h }
+      }
+    }
+  }
+  return best
 }
 
 function leaders(stats: PlayerStats[], pick: (s: PlayerStats) => number): Leaders | null {
@@ -231,6 +258,8 @@ export async function computeSeasonWrapped(supabase: SupabaseClient, season: Sea
     phoenix: leaders(stats, s => s.revivals),
     comeback: leaders(stats, s => s.comebacks),
     biggestRound,
+    fall: biggestSwing(stats, -1),
+    rise: biggestSwing(stats, 1),
     personalBest,
     attendance,
     regulars,

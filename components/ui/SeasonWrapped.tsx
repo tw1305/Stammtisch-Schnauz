@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { computeSeasonWrapped, type Leaders, type SeasonWrapped as Wrapped } from '@/lib/wrapped'
+import { computeSeasonWrapped, type Leaders, type SeasonWrapped as Wrapped, type Swing } from '@/lib/wrapped'
 import { calculateBalances, formatBalance } from '@/lib/game-logic'
 import {
   animationsEnabled,
@@ -46,6 +46,7 @@ const BG = {
   violet: 'radial-gradient(120% 80% at 50% 0%, #5B3F99 0%, #2C1E4D 55%, #120B21 100%)',
   wood: 'radial-gradient(120% 80% at 50% 0%, #7A5230 0%, #3B2716 55%, #1A1109 100%)',
   wine: 'radial-gradient(120% 80% at 50% 0%, #6B1F2A 0%, #351017 55%, #16070A 100%)',
+  dusk: 'radial-gradient(120% 80% at 50% 0%, #6B3F5E 0%, #34192D 55%, #150A12 100%)',
   steel: 'radial-gradient(120% 80% at 50% 0%, #46546B 0%, #212937 55%, #0D1117 100%)',
 }
 
@@ -253,6 +254,74 @@ function OpponentTile({ label, color, opponents, text }: { label: string; color:
       )}
       <p className="text-sm leading-snug mt-0.5" style={{ color: MUTED }}>{text}</p>
     </div>
+  )
+}
+
+/** Season balance curve with the fall/climb segment drawn in `color` and its two ends labelled. */
+function SwingChart({ swing, color, height }: { swing: Swing; color: string; height: number }) {
+  const W = 300
+  const H = height
+  const padX = 8
+  const padY = 18 // room for the end labels
+  const h = swing.history
+  const min = Math.min(0, ...h)
+  const max = Math.max(0, ...h)
+  const span = max - min || 1
+  const x = (i: number) => padX + (i / Math.max(1, h.length - 1)) * (W - padX * 2)
+  const y = (v: number) => H - padY - ((v - min) / span) * (H - padY * 2)
+  const all = h.map((v, i) => `${x(i)},${y(v)}`).join(' ')
+  const seg = h.slice(swing.fromIdx, swing.toIdx + 1).map((v, k) => `${x(swing.fromIdx + k)},${y(v)}`).join(' ')
+  const label = (i: number, v: number, above: boolean) => {
+    const lx = Math.min(W - 30, Math.max(30, x(i)))
+    return (
+      <text x={lx} y={above ? y(v) - 7 : y(v) + 15} textAnchor="middle" fontSize="12" fontWeight="700" fill={v >= 0 ? PLUS : MINUS}>
+        {formatBalance(v)}
+      </text>
+    )
+  }
+  const fall = swing.to < swing.from
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} className="block overflow-visible" aria-hidden="true">
+      <line x1={padX} x2={W - padX} y1={y(0)} y2={y(0)} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 4" />
+      <polyline points={all} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.6" strokeLinejoin="round" />
+      <polyline points={seg} fill="none" stroke={color} strokeWidth="3.2" strokeLinejoin="round" strokeLinecap="round" pathLength={1} className="sw-draw" />
+      <circle cx={x(swing.fromIdx)} cy={y(swing.from)} r="4" fill={CREAM} />
+      <circle cx={x(swing.toIdx)} cy={y(swing.to)} r="5" fill={color} />
+      {label(swing.fromIdx, swing.from, fall)}
+      {label(swing.toIdx, swing.to, !fall)}
+    </svg>
+  )
+}
+
+/** Card for one rollercoaster ride: who, from where to where, and the curve. */
+function SwingCard({ swing, label, color, delay }: { swing: Swing; label: string; color: string; delay: number }) {
+  const amount = Math.abs(swing.to - swing.from)
+  const vh = typeof window === 'undefined' ? 800 : window.innerHeight
+  return (
+    <Rise delay={delay}>
+      <div
+        className="rounded-3xl px-4 pt-4 pb-2 text-left"
+        style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, border: `1.5px solid color-mix(in srgb, ${color} 55%, transparent)` }}
+      >
+        <div className="flex items-center gap-3.5">
+          <PlayerAvatar name={swing.player.name} avatarUrl={swing.player.avatar_url} size={Math.round(Math.min(64, heroSize() * 0.4))} />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-wider font-bold whitespace-nowrap" style={{ color }}>{label}</p>
+            <p className="text-xl font-bold leading-tight truncate" style={{ color: CREAM }}>{swing.player.name}</p>
+          </div>
+          <p className="font-[family-name:var(--font-display)] text-[clamp(2rem,10vw,2.8rem)] font-extrabold tabular-nums leading-none shrink-0" style={{ color }}>
+            <CountUp value={amount} delay={delay + 0.2} format={n => `${swing.to < swing.from ? '−' : '+'}${n} €`} />
+          </p>
+        </div>
+        <p className="text-sm mt-2" style={{ color: MUTED }}>
+          von <span className="font-semibold" style={{ color: swing.from >= 0 ? PLUS : MINUS }}>{formatBalance(swing.from)}</span> auf{' '}
+          <span className="font-semibold" style={{ color: swing.to >= 0 ? PLUS : MINUS }}>{formatBalance(swing.to)}</span>
+        </p>
+        <div className="mt-1">
+          <SwingChart swing={swing} color={color} height={Math.round(Math.max(64, Math.min(110, vh * 0.12)))} />
+        </div>
+      </div>
+    </Rise>
   )
 }
 
@@ -497,6 +566,25 @@ export default function SeasonWrapped({ season, onClose }: { season: Season; onC
                   sub={`${dayLabel(d.worstEvening.date)} – zum Vergessen`}
                 />
               )}
+            </div>
+          </div>
+        ),
+      })
+    }
+
+    // 4b — Achterbahn: biggest fall from a high, biggest climb out of a low
+    if (d.fall || d.rise) {
+      list.push({
+        key: 'rollercoaster',
+        bg: BG.dusk,
+        ms: SLIDE_MS + 1500,
+        view: (
+          <div className="text-center w-full">
+            <Kicker>Achterbahn 🎢</Kicker>
+            <Title>Wie gewonnen, so zerronnen.</Title>
+            <div className="space-y-[clamp(0.75rem,2vh,1rem)] mt-[clamp(1rem,3.5vh,2.5rem)]">
+              {d.fall && <SwingCard swing={d.fall} label="📉 Der tiefe Fall" color={MINUS} delay={0.4} />}
+              {d.rise && <SwingCard swing={d.rise} label="📈 Das Comeback" color={PLUS} delay={1} />}
             </div>
           </div>
         ),
