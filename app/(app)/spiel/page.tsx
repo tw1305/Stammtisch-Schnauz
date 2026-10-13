@@ -14,7 +14,7 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import { computeSessionSummary, computeWinStreaks, fetchByIds, loadPlayerMap, clearStatsCache } from '@/lib/stats'
+import { computeSessionSummary, computeWinStreaks, fetchByIds, loadPlayers, loadPlayerMap, clearStatsCache } from '@/lib/stats'
 import {
   feedbackEliminate,
   feedbackRevive,
@@ -86,6 +86,7 @@ export default function SpielPage() {
   const [effects, setEffects] = useState<GameEffect[]>([])
   const [coinRain, setCoinRain] = useState(false)
   const effectId = useRef(0)
+  const balanceRequest = useRef(0)
   const testMode = useTestMode()
   // Noob signs: change (drop in / topple away) only when a round starts.
   const noobSigns = useNoobSigns(session?.id ?? null, activeRound?.id ?? null, completedRound?.round.id)
@@ -128,9 +129,12 @@ export default function SpielPage() {
     [completedRound?.round.id]
   )
 
+  // Balances only change when a round ends, is reopened or another device finishes
+  // one — not on every tap during a round, so don't refetch the season then.
   useEffect(() => {
     if (activeSeason) loadSeasonBalances()
-  }, [activeSeason, session, completedRound, roundPlayers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSeason?.id, session?.id, activeRound?.id, completedRound?.round.id])
 
   // Winner feedback when a round completes: ("First Blood" call +) victory song + coin rain
   useEffect(() => {
@@ -140,22 +144,17 @@ export default function SpielPage() {
   }, [completedRound])
 
   async function loadMeta() {
-    const { data: seasons } = await supabase
-      .from('seasons')
-      .select('*')
-      .eq('status', 'active')
-      .limit(1)
+    const [{ data: seasons }, all] = await Promise.all([
+      supabase.from('seasons').select('*').eq('status', 'active').limit(1),
+      loadPlayers(supabase), // shared cache: avatars are loaded once, not per screen
+    ])
     setActiveSeason(seasons?.[0] ?? null)
 
-    const { data: players } = await supabase
-      .from('players')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
-    setAllPlayers(players || [])
+    const players = all.filter(p => p.is_active)
+    setAllPlayers(players)
 
     // Default selection: Domi, Tom, André (if they exist)
-    const defaults = (players || []).filter(p => DEFAULT_PLAYERS.includes(p.name)).map(p => p.id)
+    const defaults = players.filter(p => DEFAULT_PLAYERS.includes(p.name)).map(p => p.id)
     setPickedIds(new Set(defaults))
 
     const saved = localStorage.getItem('schnauz_default_stake')
@@ -165,36 +164,27 @@ export default function SpielPage() {
   // Season-wide balance (carry-over + all sessions of the active season)
   async function loadSeasonBalances() {
     if (!activeSeason) return
+    const req = ++balanceRequest.current
     const { data: sessions } = await supabase
       .from('sessions')
       .select('id')
       .eq('season_id', activeSeason.id)
 
     const sessionIds = (sessions || []).map(s => s.id)
-    if (sessionIds.length === 0) {
-      setSessionBalances({})
-      return
-    }
-
-    const { data: rounds } = await supabase
-      .from('rounds')
-      .select('id')
-      .in('session_id', sessionIds)
-      .eq('status', 'completed')
-
-    const roundIds = (rounds || []).map(r => r.id)
-    if (roundIds.length === 0) {
-      setSessionBalances({})
-      return
-    }
-
-    const { data: rps } = await supabase
-      .from('round_players')
-      .select('player_id, balance_change')
-      .in('round_id', roundIds)
+    // Paged/chunked loads: a long season can pass PostgREST's 1000-row cap.
+    const rounds = sessionIds.length
+      ? await fetchByIds<{ id: string; status: string }>(supabase, 'rounds', 'id, status', 'session_id', sessionIds)
+      : []
+    const roundIds = rounds.filter(r => r.status === 'completed').map(r => r.id)
+    const rps = roundIds.length
+      ? await fetchByIds<{ player_id: string; balance_change: number | null }>(
+          supabase, 'round_players', 'id, player_id, balance_change', 'round_id', roundIds
+        )
+      : []
+    if (req !== balanceRequest.current) return // a newer load is on its way
 
     const balances: Record<string, number> = {}
-    for (const rp of rps || []) {
+    for (const rp of rps) {
       if (rp.balance_change != null) {
         balances[rp.player_id] = (balances[rp.player_id] ?? 0) + rp.balance_change
       }

@@ -5,6 +5,29 @@ import { createClient } from '@/lib/supabase/client'
 import type { Session, SessionPlayer, Round, RoundPlayer, RoundFire } from '@/types/database'
 import { calculateBalances } from '@/lib/game-logic'
 import { isFirstBlood } from '@/lib/effects'
+import { loadPlayerMap, clearStatsCache } from '@/lib/stats'
+
+type Supa = ReturnType<typeof createClient>
+
+/**
+ * Attaches the player (name, avatar …) to session/round rows. Avatars are big
+ * base64 images, so they come once from the shared players cache instead of a
+ * `player:players(*)` join on every reload. A player missing from the cache
+ * (added on another device meanwhile) triggers one fresh load.
+ */
+async function withPlayers<T extends { player_id: string }>(supabase: Supa, rows: T[]): Promise<T[]> {
+  let players = await loadPlayerMap(supabase)
+  if (rows.some(r => !players.has(r.player_id))) {
+    clearStatsCache()
+    players = await loadPlayerMap(supabase)
+  }
+  return rows.map(r => ({ ...r, player: players.get(r.player_id) }))
+}
+
+async function fetchRoundPlayers(supabase: Supa, roundId: string): Promise<RoundPlayer[]> {
+  const { data } = await supabase.from('round_players').select('*').eq('round_id', roundId)
+  return withPlayers(supabase, (data || []) as RoundPlayer[])
+}
 
 type UndoAction =
   | { kind: 'eliminate'; rpId: string; prevWasFirst: boolean }
@@ -51,15 +74,15 @@ export function useSession() {
     const sess = sessions[0]
     setSession(sess)
 
-    const { data: sp } = await supabase
-      .from('session_players')
-      .select('*, player:players(*)')
-      .eq('session_id', sess.id)
-      .is('removed_at', null)
-      .order('joined_at')
+    // Table and running round load side by side.
+    const [{ data: spRows }, { data: rounds }] = await Promise.all([
+      supabase.from('session_players').select('*').eq('session_id', sess.id).is('removed_at', null).order('joined_at'),
+      supabase.from('rounds').select('*').eq('session_id', sess.id).eq('status', 'active').limit(1),
+    ])
+    const sp = await withPlayers(supabase, (spRows || []) as SessionPlayer[])
 
     // Client-side seat ordering (column may not exist yet → fallback to joined order)
-    const ordered = (sp || []).slice().sort((a, b) => {
+    const ordered = sp.slice().sort((a, b) => {
       const ao = a.seat_order, bo = b.seat_order
       if (ao == null && bo == null) return 0
       if (ao == null) return 1
@@ -68,27 +91,15 @@ export function useSession() {
     })
     setSessionPlayers(ordered)
 
-    const { data: rounds } = await supabase
-      .from('rounds')
-      .select('*')
-      .eq('session_id', sess.id)
-      .eq('status', 'active')
-      .limit(1)
-
     if (rounds && rounds.length > 0) {
       const round = rounds[0]
-      setActiveRound(round)
-      const { data: rp } = await supabase
-        .from('round_players')
-        .select('*, player:players(*)')
-        .eq('round_id', round.id)
-      setRoundPlayers(rp || [])
       // Defensive: the round_fires table only exists after the migration.
-      const { data: fires, error: firesError } = await supabase
-        .from('round_fires')
-        .select('*')
-        .eq('round_id', round.id)
-        .order('created_at')
+      const [rp, { data: fires, error: firesError }] = await Promise.all([
+        fetchRoundPlayers(supabase, round.id),
+        supabase.from('round_fires').select('*').eq('round_id', round.id).order('created_at'),
+      ])
+      setActiveRound(round)
+      setRoundPlayers(rp)
       setRoundFires(firesError ? [] : fires || [])
     } else {
       setActiveRound(null)
@@ -275,12 +286,9 @@ export function useSession() {
   }
 
   async function reloadRoundPlayers(roundId: string) {
-    const { data } = await supabase
-      .from('round_players')
-      .select('*, player:players(*)')
-      .eq('round_id', roundId)
-    setRoundPlayers(data || [])
-    return (data || []) as RoundPlayer[]
+    const rps = await fetchRoundPlayers(supabase, roundId)
+    setRoundPlayers(rps)
+    return rps
   }
 
   async function eliminatePlayer(playerId: string) {
@@ -305,11 +313,11 @@ export function useSession() {
     const activePlayers = updated.filter(r => r.is_active)
 
     if (activePlayers.length === 2) {
-      for (const ap of activePlayers) {
-        if (!ap.reached_final) {
-          await supabase.from('round_players').update({ reached_final: true }).eq('id', ap.id)
-        }
-      }
+      await Promise.all(
+        activePlayers
+          .filter(ap => !ap.reached_final)
+          .map(ap => supabase.from('round_players').update({ reached_final: true }).eq('id', ap.id))
+      )
     }
     if (activePlayers.length === 1) {
       await endRound(updated, activePlayers[0].player_id, playerId)
@@ -321,15 +329,15 @@ export function useSession() {
     const rp = roundPlayers.find(r => r.player_id === playerId)
     if (!rp || rp.is_active) return
 
-    await supabase.from('round_players').update({ is_active: true, was_revived: true }).eq('id', rp.id)
-
     const reviver = roundPlayers.find(r => r.player_id === reviverId)
-    if (reviver) {
-      await supabase
-        .from('round_players')
-        .update({ revives_given: (reviver.revives_given ?? 0) + 1 })
-        .eq('id', reviver.id)
-    }
+    await Promise.all([
+      supabase.from('round_players').update({ is_active: true, was_revived: true }).eq('id', rp.id),
+      reviver &&
+        supabase
+          .from('round_players')
+          .update({ revives_given: (reviver.revives_given ?? 0) + 1 })
+          .eq('id', reviver.id),
+    ])
 
     setUndoStack(s => [
       ...s,
@@ -394,43 +402,43 @@ export function useSession() {
     const { stake, player_count } = activeRound
     const { winnerGain, loserLoss } = calculateBalances(player_count, stake)
 
-    for (const rp of players) {
-      const isWinner = rp.player_id === winnerId
-      await supabase
-        .from('round_players')
-        .update({
-          is_winner: isWinner,
-          balance_change: isWinner ? winnerGain : loserLoss,
-          reached_final: rp.reached_final || isWinner,
-        })
-        .eq('id', rp.id)
-    }
-
-    await supabase
-      .from('rounds')
-      .update({ status: 'completed', winner_id: winnerId, ended_at: new Date().toISOString() })
-      .eq('id', activeRound.id)
+    // All balances at once; the round is only marked completed once they're stored.
+    await Promise.all(
+      players.map(rp => {
+        const isWinner = rp.player_id === winnerId
+        return supabase
+          .from('round_players')
+          .update({
+            is_winner: isWinner,
+            balance_change: isWinner ? winnerGain : loserLoss,
+            reached_final: rp.reached_final || isWinner,
+          })
+          .eq('id', rp.id)
+      })
+    )
 
     // The player who was first out this round deals the next one.
     const prevDealerId = session?.dealer_player_id ?? null
     const firstOut = players.find(p => p.was_first_eliminated && p.player_id !== winnerId)
-    if (firstOut && session) {
-      await supabase.from('sessions').update({ dealer_player_id: firstOut.player_id }).eq('id', session.id)
-    }
+    await Promise.all([
+      supabase
+        .from('rounds')
+        .update({ status: 'completed', winner_id: winnerId, ended_at: new Date().toISOString() })
+        .eq('id', activeRound.id),
+      firstOut && session
+        ? supabase.from('sessions').update({ dealer_player_id: firstOut.player_id }).eq('id', session.id)
+        : null,
+    ])
 
-    const { data: finalRp } = await supabase
-      .from('round_players')
-      .select('*, player:players(*)')
-      .eq('round_id', activeRound.id)
-    const { data: sessionRounds } = await supabase
-      .from('rounds')
-      .select('id, round_number, status')
-      .eq('session_id', activeRound.session_id)
+    const [finalRp, { data: sessionRounds }] = await Promise.all([
+      fetchRoundPlayers(supabase, activeRound.id),
+      supabase.from('rounds').select('id, round_number, status').eq('session_id', activeRound.session_id),
+    ])
     const firstBlood = isFirstBlood(sessionRounds || [], activeRound.id)
 
     setCompletedRound({
       round: { ...activeRound, status: 'completed', winner_id: winnerId },
-      players: finalRp || [],
+      players: finalRp,
       winnerId,
       reactivatePlayerId: lastEliminatedId,
       prevDealerId,
