@@ -52,6 +52,8 @@ export function useSession() {
     prevDealerId: string | null
     /** Winner of the session's first round: blood + "First Blood" call before the music. */
     firstBlood: boolean
+    /** Fires recorded during the round (milestones). */
+    fires: RoundFire[]
   } | null>(null)
 
   const loadActiveSession = useCallback(async () => {
@@ -443,6 +445,7 @@ export function useSession() {
       reactivatePlayerId: lastEliminatedId,
       prevDealerId,
       firstBlood,
+      fires: roundFires,
     })
     setUndoStack([])
     setActiveRound(null)

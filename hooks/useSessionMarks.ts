@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { noobSigns, type NoobRound } from '@/lib/effects'
+import { noobSigns, rainCloudIds, type NoobRound } from '@/lib/effects'
 import { animationsEnabled } from '@/lib/feedback'
 import { NOOB_LEAVE_MS, type NoobSignState } from '@/components/ui/RoundEffects'
 
@@ -26,21 +26,24 @@ function writeAnimated(roundId: string) {
 }
 
 /**
- * Noob signs at the table, derived from the session's completed rounds (no extra
+ * Session marks at the table: rain clouds (losing streak, updated right after
+ * every round) and Noob signs, derived from the session's completed rounds (no extra
  * DB state: reloads, live sync, undo and new sessions are handled for free).
  * Changes only happen when a round starts — new signs drop in, signs of players
  * who were not first out last round topple away.
  *
  * @param refreshKey changes whenever a round ends or is reopened
  */
-export function useNoobSigns(sessionId: string | null, activeRoundId: string | null, refreshKey?: string | null) {
+export function useSessionMarks(sessionId: string | null, activeRoundId: string | null, refreshKey?: string | null) {
   const [signs, setSigns] = useState<Map<string, NoobSignState>>(new Map())
+  const [rainClouds, setRainClouds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     if (!sessionId) {
       setSigns(new Map()) // eslint-disable-line react-hooks/set-state-in-effect
+      setRainClouds(new Set())
       return
     }
     const supabase = createClient()
@@ -66,7 +69,9 @@ export function useNoobSigns(sessionId: string | null, activeRoundId: string | n
         nr.participants.push(rp.player_id)
         if (rp.was_first_eliminated) nr.firstOut.push(rp.player_id)
       }
-      const result = noobSigns(ids.map(id => byRound.get(id)!), !!activeRoundId)
+      const completed = ids.map(id => byRound.get(id)!)
+      const result = noobSigns(completed, !!activeRoundId)
+      setRainClouds(rainCloudIds(completed))
 
       // Animate a round's changes once; afterwards (reload, live sync) the signs just stand there.
       const animate = !!activeRoundId && animationsEnabled() && readAnimated() !== activeRoundId
@@ -91,5 +96,5 @@ export function useNoobSigns(sessionId: string | null, activeRoundId: string | n
     }
   }, [sessionId, activeRoundId, refreshKey])
 
-  return signs
+  return { noobSigns: signs, rainClouds }
 }

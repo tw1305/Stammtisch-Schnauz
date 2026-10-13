@@ -6,20 +6,34 @@ import { feedbackWinner, initFeedback } from '@/lib/feedback'
 import { STORM_LEVELS, stormFor } from '@/lib/effects'
 import RoundResultModal from './RoundResultModal'
 import PlayerAvatar from './PlayerAvatar'
-import { NoobSign, NOOB_LEAVE_MS, type NoobSignState } from './RoundEffects'
+import { NoobSign, NOOB_LEAVE_MS, Bandage, RainCloud, type NoobSignState } from './RoundEffects'
+import { findMilestones, EMPTY_TOTALS, type PlayerMilestones } from '@/lib/milestones'
 import type { Player, RoundPlayer } from '@/types/database'
 
-type Preview = { stake: number; firstBlood: boolean; key: number }
+type Preview = { stake: number; firstBlood: boolean; milestones: boolean; key: number }
+
+/** Example milestones for the preview: winner 100. Sieg + 5 in a row, others a round and a shame jubilee. */
+function demoMilestones(players: Player[]): PlayerMilestones[] {
+  const t = EMPTY_TOTALS
+  const [w, a, b] = players
+  const out: PlayerMilestones[] = []
+  if (w) out.push({ playerId: w.id, name: w.name, items: findMilestones({ ...t, wins: 99, streak: 4 }, { ...t, wins: 100, streak: 5 }) })
+  if (a) out.push({ playerId: a.id, name: a.name, items: findMilestones({ ...t, rounds: 99 }, { ...t, rounds: 100 }) })
+  if (b) out.push({ playerId: b.id, name: b.name, items: findMilestones({ ...t, firstOuts: 49, balance: -95 }, { ...t, firstOuts: 50, balance: -101 }) })
+  return out
+}
 
 /**
  * Test-mode playground for the round effects: opens the real result screen with
- * made-up data (First Blood, every storm level, combinations) and drops /
- * topples a Noob sign. Nothing is stored.
+ * made-up data (First Blood, every storm level, milestones, combinations) and
+ * shows the portrait decorations (Noob sign, band-aids, rain cloud). Nothing is stored.
  */
 export default function EffectPreview() {
   const [players, setPlayers] = useState<Player[]>([])
   const [preview, setPreview] = useState<Preview | null>(null)
   const [sign, setSign] = useState<NoobSignState | null>(null)
+  const [bandage, setBandage] = useState(false)
+  const [cloud, setCloud] = useState(false)
 
   useEffect(() => {
     createClient()
@@ -38,11 +52,12 @@ export default function EffectPreview() {
     { label: '🩸 First Blood', stake: STORM_LEVELS[0].minStake - 1, firstBlood: true },
     ...STORM_LEVELS.map((l, i) => ({ label: `${i >= 3 ? '⛈️' : '⚡'} ${l.minStake} €`, stake: l.minStake, firstBlood: false })),
     { label: `🩸⛈️ ${top} €`, stake: top, firstBlood: true },
+    { label: '🏅 Meilenstein', stake: STORM_LEVELS[0].minStake - 1, firstBlood: false, milestones: true },
   ]
 
-  function open(stake: number, firstBlood: boolean) {
+  function open(stake: number, firstBlood: boolean, milestones = false) {
     feedbackWinner({ firstBlood })
-    setPreview(p => ({ stake, firstBlood, key: (p?.key ?? 0) + 1 }))
+    setPreview(p => ({ stake, firstBlood, milestones, key: (p?.key ?? 0) + 1 }))
   }
 
   function dropSign() {
@@ -79,7 +94,7 @@ export default function EffectPreview() {
           {buttons.map(b => (
             <button
               key={b.label}
-              onClick={() => open(b.stake, b.firstBlood)}
+              onClick={() => open(b.stake, b.firstBlood, 'milestones' in b && b.milestones)}
               disabled={players.length < 2}
               className="bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl py-2 text-[11px] font-medium text-[#23201A] active:bg-[#E4D9BF] disabled:opacity-40"
             >
@@ -91,16 +106,24 @@ export default function EffectPreview() {
 
       {demo && (
         <div className="flex items-center gap-3">
-          <div className="relative w-[64px] h-[64px] mt-6 shrink-0">
+          <div className="relative w-[64px] h-[64px] mt-16 shrink-0">
             <PlayerAvatar name={demo.name} avatarUrl={demo.avatar_url} size={64} />
             {sign && <NoobSign key={sign === 'enter' ? 'enter' : 'other'} size={64} state={sign} />}
+            {bandage && <Bandage size={64} />}
+            {cloud && <RainCloud size={64} raised={!!sign && sign !== 'leave'} />}
           </div>
-          <div className="flex gap-1.5 flex-1">
-            <button onClick={dropSign} className="flex-1 bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl py-2 text-[11px] font-medium text-[#23201A]">
+          <div className="grid grid-cols-2 gap-1.5 flex-1">
+            <button onClick={dropSign} className="bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl py-2 text-[11px] font-medium text-[#23201A]">
               Noob-Schild fällt
             </button>
-            <button onClick={toppleSign} disabled={!sign} className="flex-1 bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl py-2 text-[11px] font-medium text-[#23201A] disabled:opacity-40">
+            <button onClick={toppleSign} disabled={!sign} className="bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl py-2 text-[11px] font-medium text-[#23201A] disabled:opacity-40">
               Schild kippt weg
+            </button>
+            <button onClick={() => setBandage(v => !v)} className={`border rounded-xl py-2 text-[11px] font-medium text-[#23201A] ${bandage ? 'bg-[#E4D9BF] border-[#C9B990]' : 'bg-[#FFFDF7] border-[#E4D9BF]'}`}>
+              🩹 Pflaster
+            </button>
+            <button onClick={() => setCloud(v => !v)} className={`border rounded-xl py-2 text-[11px] font-medium text-[#23201A] ${cloud ? 'bg-[#E4D9BF] border-[#C9B990]' : 'bg-[#FFFDF7] border-[#E4D9BF]'}`}>
+              🌧️ Regenwolke
             </button>
           </div>
         </div>
@@ -118,6 +141,7 @@ export default function EffectPreview() {
           onEndSession={() => setPreview(null)}
           firstBlood={preview.firstBlood}
           storm={stormFor(preview.stake)}
+          milestones={preview.milestones ? demoMilestones(players) : []}
         />
       )}
     </div>

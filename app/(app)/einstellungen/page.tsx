@@ -205,7 +205,7 @@ export default function EinstellungenPage() {
         <div className="bg-[#FBF6EA] border border-[#E4D9BF] rounded-2xl overflow-hidden">
           <Toggle
             title="Animationen"
-            desc="Grabstein, Spritze, Feuerexplosion, Münzregen, Feuerring, Blut, Blitze & Noob-Schild"
+            desc="Grabstein, Spritze, Feuerexplosion, Münzregen, Feuerring, Blut, Blitze, Finale-Duell, Konfetti & Noob-Schild"
             on={animOn}
             onToggle={toggleAnimations}
           />

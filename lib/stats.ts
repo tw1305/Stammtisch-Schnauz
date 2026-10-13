@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { EMPTY_TOTALS, type PlayerTotals } from '@/lib/milestones'
 import type { Player, PlayerStats, Badge, HeadToHead, Session, Season, SessionBalancePoint, AchievementTally, SessionSummary, ScopeSummary } from '@/types/database'
 
 type Supa = SupabaseClient
@@ -236,35 +237,66 @@ export async function computeScopeSummary(supabase: Supa, seasonId?: string | nu
 /** Number of consecutive wins needed to be shown "on fire". */
 export const ON_FIRE_STREAK = 3
 
+/** All-time totals of a player at the table (milestones + win streak rings); the balance stays 0 here. */
+export type TableTotals = PlayerTotals
+
 /**
- * Current winning streak per player: how many of their own most recent
- * completed real rounds they won in a row (only players with a streak ≥ 1 are
- * returned). Counted over the player's rounds in chronological order regardless
- * of session or season boundaries, so sessions a player skipped don't break it.
+ * All-time totals per player over completed real rounds: wins, rounds, first-outs,
+ * revives (received / given), fires and the current winning streak. The streak is
+ * how many of their own most recent rounds they won in a row, regardless of
+ * session or season boundaries, so sessions a player skipped don't break it:
  * 1 → golden ring, 2 → glowing golden ring, ON_FIRE_STREAK+ → ring of flames.
  */
-export async function computeWinStreaks(supabase: Supa, playerIds: string[]): Promise<Map<string, number>> {
-  const result = new Map<string, number>()
+export async function computePlayerTotals(supabase: Supa, playerIds: string[]): Promise<Map<string, TableTotals>> {
+  const result = new Map<string, TableTotals>()
   if (playerIds.length === 0) return result
-  const rows = await fetchByIds<{
-    player_id: string
-    is_winner: boolean
-    round: { started_at: string; status: string; round_number: number } | null
-  }>(supabase, 'round_players', 'id, player_id, is_winner, round:rounds(started_at, status, round_number)', 'player_id', playerIds)
+  type Meta = { started_at: string; status: string; round_number: number } | null
+  const [rows, fires] = await Promise.all([
+    fetchByIds<{
+      player_id: string
+      is_winner: boolean
+      was_first_eliminated: boolean
+      was_revived: boolean
+      revives_given: number | null
+      round: Meta
+    }>(
+      supabase,
+      'round_players',
+      'id, player_id, is_winner, was_first_eliminated, was_revived, revives_given, round:rounds(started_at, status, round_number)',
+      'player_id',
+      playerIds
+    ),
+    // Defensive: the round_fires table only exists after its migration.
+    fetchByIds<{ player_id: string; round: Meta }>(
+      supabase, 'round_fires', 'id, player_id, round:rounds(started_at, status, round_number)', 'player_id', playerIds
+    ).catch(() => []),
+  ])
+  const real = (m: Meta) => !!m && m.status === 'completed' && m.round_number > 0
 
-  const byPlayer: Record<string, { at: number; won: boolean }[]> = {}
+  const history: Record<string, { at: number; won: boolean }[]> = {}
+  for (const pid of playerIds) result.set(pid, { ...EMPTY_TOTALS })
   for (const r of rows) {
-    if (!r.round || r.round.status !== 'completed' || r.round.round_number <= 0) continue
-    ;(byPlayer[r.player_id] ??= []).push({ at: new Date(r.round.started_at).getTime(), won: r.is_winner })
+    const t = result.get(r.player_id)
+    if (!t || !real(r.round)) continue
+    t.rounds++
+    if (r.is_winner) t.wins++
+    if (r.was_first_eliminated) t.firstOuts++
+    if (r.was_revived) t.revived++
+    t.revivesGiven += r.revives_given ?? 0
+    ;(history[r.player_id] ??= []).push({ at: new Date(r.round!.started_at).getTime(), won: r.is_winner })
   }
-  for (const [pid, list] of Object.entries(byPlayer)) {
+  for (const f of fires) {
+    const t = result.get(f.player_id)
+    if (t && real(f.round)) t.fires++
+  }
+  for (const [pid, list] of Object.entries(history)) {
     list.sort((a, b) => b.at - a.at) // newest first
     let streak = 0
     for (const x of list) {
       if (!x.won) break
       streak++
     }
-    if (streak > 0) result.set(pid, streak)
+    result.get(pid)!.streak = streak
   }
   return result
 }

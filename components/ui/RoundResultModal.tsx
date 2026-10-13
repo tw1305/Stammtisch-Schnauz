@@ -3,7 +3,8 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import PlayerAvatar from './PlayerAvatar'
 import GhostBurst, { type GhostWave } from './GhostBurst'
-import { BloodSplash, StormOverlay } from './RoundEffects'
+import { BloodSplash, StormOverlay, MilestoneBanner, ConfettiBurst } from './RoundEffects'
+import { milestoneText, type PlayerMilestones } from '@/lib/milestones'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import { animationsEnabled, reducedMotion } from '@/lib/feedback'
 import { softenStorm, type StormLevel } from '@/lib/effects'
@@ -24,6 +25,8 @@ type Props = {
   firstBlood?: boolean
   /** Won with a stake of 3 € or more: lightning storm, stronger with the stake (lib/effects stormFor). */
   storm?: StormLevel | null
+  /** Milestones reached this round ("100. Sieg!"), winner's shown most prominently. */
+  milestones?: PlayerMilestones[]
 }
 
 /**
@@ -61,6 +64,7 @@ export default function RoundResultModal({
   onUndo,
   firstBlood = false,
   storm = null,
+  milestones = [],
 }: Props) {
   const winner = players.find(p => p.player_id === winnerId)
   const winnerName = winner?.player?.name ?? 'Unbekannt'
@@ -68,6 +72,8 @@ export default function RoundResultModal({
   const streakLine = streakText(winnerStreak)
   // Won "aus dem Jenseits": eliminated, revived, and then won the round.
   const comeback = !!winner?.was_revived
+  const winnerMs = milestones.find(m => m.playerId === winnerId)?.items ?? []
+  const otherMs = milestones.filter(m => m.playerId !== winnerId).flatMap(m => m.items.map(item => ({ item, name: m.name })))
 
   const [animated] = useState(() => animationsEnabled())
   const [phase, setPhase] = useState<Phase>(animated ? 'award' : 'done')
@@ -149,6 +155,12 @@ export default function RoundResultModal({
           {firstBlood && <p className="text-[#FF8A8A] font-extrabold uppercase tracking-[0.2em] mt-1 drop-shadow">🩸 First Blood</p>}
           {comeback && <p className="text-[#DCE8FF] font-semibold mt-1 drop-shadow">👻 Aus dem Jenseits!</p>}
           {streakLine && <p className="text-[#FFD86B] font-semibold mt-1 drop-shadow">{streakLine}</p>}
+          {winnerMs[0] && (
+            <div className="relative mt-2.5 inline-block text-base">
+              <ConfettiBurst delay={0.5} />
+              <MilestoneBanner icon={winnerMs[0].icon} text={milestoneText(winnerMs[0], winnerMs[0].kind === 'balance' ? winnerName : undefined)} />
+            </div>
+          )}
         </div>
       )}
 
@@ -189,6 +201,22 @@ export default function RoundResultModal({
             {firstBlood && <p className="text-[#A10B18] font-bold text-sm mt-1 tracking-wide">🩸 First Blood – erste Runde der Session</p>}
             {comeback && <p className="text-[#4B5D86] font-semibold text-sm mt-1">👻 Aus dem Jenseits!</p>}
             {streakLine && <p className="text-[#9A6A0C] font-semibold text-sm mt-1">{streakLine}</p>}
+            {(winnerMs.length > 0 || otherMs.length > 0) && (
+              <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 text-sm">
+                {winnerMs.map(m => (
+                  <MilestoneBanner key={m.kind + m.value} icon={m.icon} text={milestoneText(m, m.kind === 'balance' ? winnerName : undefined)} />
+                ))}
+                {otherMs.map(({ item, name }) => (
+                  <span
+                    key={name + item.kind + item.value}
+                    className="inline-flex items-center gap-1 rounded-full border border-[#E4D9BF] bg-[#FFFDF7] px-2.5 py-0.5 text-xs font-medium text-[#23201A]"
+                  >
+                    <span aria-hidden="true">{item.icon}</span>
+                    {milestoneText(item, name)}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

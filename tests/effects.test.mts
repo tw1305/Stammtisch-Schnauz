@@ -5,6 +5,9 @@ import {
   isFirstBlood,
   computeNoobStreaks,
   noobSigns,
+  computeDrySpells,
+  rainCloudIds,
+  DRY_SPELL_MIN,
   stormFor,
   softenStorm,
   STORM_LEVELS,
@@ -147,4 +150,19 @@ test('Storm: reduced motion keeps the effect but drops shake and flicker', () =>
   assert.equal(soft.shake, 0)
   assert.equal(soft.flicker, false)
   assert.ok(soft.flash <= 0.2 && soft.bolts >= 1)
+})
+
+// ---------- Rain cloud ----------
+
+test('Rain cloud: from 4 rounds in a row without a win, gone with the next win', () => {
+  const lostBy = (w: string) => round(ABC, null, w)
+  assert.equal(rainCloudIds([lostBy('b'), lostBy('b'), lostBy('b')]).has('a'), false)
+  assert.equal(rainCloudIds([lostBy('b'), lostBy('b'), lostBy('b'), lostBy('c')]).has('a'), true)
+  assert.equal(rainCloudIds([lostBy('b'), lostBy('b'), lostBy('b'), lostBy('c'), lostBy('a')]).has('a'), false)
+})
+
+test('Rain cloud: sitting a round out keeps the dry spell', () => {
+  const s = computeDrySpells([round(ABC, null, 'b'), round(['b', 'c'], null, 'b'), round(ABC, null, 'c')])
+  assert.equal(s.get('a'), 2)
+  assert.equal(DRY_SPELL_MIN, 4)
 })

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from './PlayerAvatar'
 import { PlayerEffect, SyringeFlight, type GameEffect } from './GameEffects'
-import { NoobSign, type NoobSignState } from './RoundEffects'
+import { NoobSign, Bandage, RainCloud, FinalDuel, type NoobSignState } from './RoundEffects'
+import { animationsEnabled } from '@/lib/feedback'
 import type { SessionPlayer, RoundPlayer } from '@/types/database'
 
 type GameTableProps = {
@@ -20,6 +21,8 @@ type GameTableProps = {
   effects?: GameEffect[]
   /** "Noob" signs above portraits (repeatedly first out). */
   noobSigns?: Map<string, NoobSignState>
+  /** Rain clouds above portraits (losing streak in the session). */
+  rainClouds?: Set<string>
 }
 
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
@@ -147,6 +150,7 @@ export default function GameTable({
   winStreaks,
   effects = [],
   noobSigns,
+  rainClouds,
 }: GameTableProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 0, h: 0 })
@@ -215,6 +219,11 @@ export default function GameTable({
     return effects.filter(e => e.playerId === playerId)
   }
 
+  // The medic call + revive animation keep the player grey until the syringe has injected.
+  function heldGrayFor(playerId: string) {
+    return effects.some(e => e.playerId === playerId && (e.kind === 'revive' || e.kind === 'medic') && e.holdGray)
+  }
+
   function seatOf(playerId: string) {
     const i = sessionPlayers.findIndex(sp => sp.player_id === playerId)
     return i >= 0 ? positions[i] : null
@@ -223,6 +232,13 @@ export default function GameTable({
   function getRoundPlayer(playerId: string): RoundPlayer | undefined {
     return roundPlayers.find(rp => rp.player_id === playerId)
   }
+
+  // Final duel: a round that started with 3+ players is down to its last two.
+  const finalists =
+    isRoundActive && layout && roundPlayers.length >= 3 && animationsEnabled()
+      ? roundPlayers.filter(rp => rp.is_active && !heldGrayFor(rp.player_id)).map(rp => rp.player_id)
+      : []
+  const duelSeats = finalists.length === 2 ? finalists.map(id => seatOf(id)) : null
 
   return (
     <div ref={boxRef} className="relative w-full h-full">
@@ -287,12 +303,23 @@ export default function GameTable({
         </div>
       )}
 
+      {/* Final duel: dims the table under the tokens, spotlights the last two */}
+      {duelSeats && duelSeats[0] && duelSeats[1] && (
+        <FinalDuel
+          key={finalists.join('|')}
+          a={{ x: (duelSeats[0].left / 100) * box.w, y: (duelSeats[0].top / 100) * box.h }}
+          b={{ x: (duelSeats[1].left / 100) * box.w, y: (duelSeats[1].top / 100) * box.h }}
+          avatar={avatarPx}
+          width={box.w}
+          height={box.h}
+        />
+      )}
+
       {/* Players (active round: only once the box is measured, so nothing jumps) */}
       {(!isRoundActive || layout) && sessionPlayers.map((sp, i) => {
         const pos = positions[i]
         const rp = getRoundPlayer(sp.player_id)
-        // The medic call + revive animation keep the player grey until the syringe has injected.
-        const heldGray = playerEffectsFor(sp.player_id).some(e => (e.kind === 'revive' || e.kind === 'medic') && e.holdGray)
+        const heldGray = heldGrayFor(sp.player_id)
         const shaking = playerEffectsFor(sp.player_id).some(e => e.kind === 'medic')
         const isEliminated = isRoundActive && rp ? !rp.is_active || heldGray : false
         const isWinner = isRoundActive && rp ? rp.is_winner : false
@@ -322,7 +349,12 @@ export default function GameTable({
                 winStreak={winStreaks?.get(sp.player_id) ?? 0}
               />
               </div>
+              {/* Revived this round: band-aids, once the syringe has done its job */}
+              {isRoundActive && rp?.was_revived && !heldGray && <Bandage size={avatarPx} faded={!rp.is_active} />}
               {noobSigns?.has(sp.player_id) && <NoobSign size={avatarPx} state={noobSigns.get(sp.player_id)!} />}
+              {rainClouds?.has(sp.player_id) && (
+                <RainCloud size={avatarPx} raised={!!noobSigns?.has(sp.player_id) && noobSigns.get(sp.player_id) !== 'leave'} />
+              )}
               {dealerId === sp.player_id && (
                 <span
                   className="absolute -top-1 -left-1 bg-[#2E6B3A] text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow ring-2 ring-[#F4ECDA]"

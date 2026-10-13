@@ -92,6 +92,30 @@ export function noobSigns(completed: NoobRound[], roundActive: boolean): NoobSig
   }
 }
 
+// ---------- Rain cloud (losing streak in a session) ----------
+
+/** Rounds in a row without a win (within one session) from which a rain cloud hangs over the player. */
+export const DRY_SPELL_MIN = 4
+
+/**
+ * Rounds in a row each player played without winning, over the completed rounds
+ * of ONE session in chronological order: a win resets to 0, sitting a round out
+ * keeps the count.
+ */
+export function computeDrySpells(rounds: NoobRound[]): Map<string, number> {
+  const spells = new Map<string, number>()
+  for (const r of rounds) {
+    for (const p of r.participants) spells.set(p, p === r.winnerId ? 0 : (spells.get(p) ?? 0) + 1)
+  }
+  return spells
+}
+
+export function rainCloudIds(rounds: NoobRound[]): Set<string> {
+  const ids = new Set<string>()
+  for (const [p, n] of computeDrySpells(rounds)) if (n >= DRY_SPELL_MIN) ids.add(p)
+  return ids
+}
+
 // ---------- Storm (round won with a stake of 3 € or more) ----------
 
 export type StormLevel = {

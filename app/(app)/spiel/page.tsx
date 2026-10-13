@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
-import { useNoobSigns } from '@/hooks/useNoobSigns'
+import { useSessionMarks } from '@/hooks/useSessionMarks'
+import { applyRound, findMilestones, EMPTY_TOTALS, type PlayerMilestones } from '@/lib/milestones'
 import { stormFor } from '@/lib/effects'
 import GameTable from '@/components/ui/GameTable'
 import { NAV_HEIGHT } from '@/components/ui/BottomNav'
@@ -14,7 +15,7 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import { computeSessionSummary, computeWinStreaks, fetchByIds, loadPlayers, loadPlayerMap, clearStatsCache } from '@/lib/stats'
+import { computeSessionSummary, computePlayerTotals, fetchByIds, loadPlayers, loadPlayerMap, clearStatsCache, type TableTotals } from '@/lib/stats'
 import {
   feedbackEliminate,
   feedbackRevive,
@@ -82,14 +83,15 @@ export default function SpielPage() {
   const [reviveTarget, setReviveTarget] = useState<string | null>(null)
   const [endData, setEndData] = useState<{ session: SessionSummary; season: SeasonSummary | null } | null>(null)
   const [showFirePicker, setShowFirePicker] = useState(false)
-  const [winStreaks, setWinStreaks] = useState<Map<string, number>>(new Map())
+  const [totals, setTotals] = useState<Map<string, TableTotals>>(new Map())
   const [effects, setEffects] = useState<GameEffect[]>([])
   const [coinRain, setCoinRain] = useState(false)
   const effectId = useRef(0)
   const balanceRequest = useRef(0)
   const testMode = useTestMode()
   // Noob signs: change (drop in / topple away) only when a round starts.
-  const noobSigns = useNoobSigns(session?.id ?? null, activeRound?.id ?? null, completedRound?.round.id)
+  // Noob signs (change when a round starts) and rain clouds (losing streak, right after each round).
+  const { noobSigns, rainClouds } = useSessionMarks(session?.id ?? null, activeRound?.id ?? null, completedRound?.round.id)
 
   useEffect(() => {
     loadMeta()
@@ -113,8 +115,8 @@ export default function SpielPage() {
   useEffect(() => {
     let cancelled = false
     const ids = tableKey ? tableKey.split(',') : []
-    computeWinStreaks(supabase, ids)
-      .then(map => { if (!cancelled) setWinStreaks(map) })
+    computePlayerTotals(supabase, ids)
+      .then(map => { if (!cancelled) setTotals(map) })
       .catch(() => {})
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,10 +126,37 @@ export default function SpielPage() {
   // this round (still in winStreaks when the result first renders) plus this win.
   // Frozen per round so the later recompute doesn't count the win twice.
   const winnerStreak = useMemo(
-    () => (completedRound ? (winStreaks.get(completedRound.winnerId) ?? 0) + 1 : 0),
+    () => (completedRound ? (totals.get(completedRound.winnerId)?.streak ?? 0) + 1 : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [completedRound?.round.id]
+    [completedRound]
   )
+
+  const winStreaks = useMemo(() => new Map([...totals].map(([id, t]) => [id, t.streak])), [totals])
+
+  // Milestones of the round that just ended: totals and season balances still hold
+  // the values from before this round when the result first renders (both reload
+  // afterwards), so before + this round = after. Frozen per completed round.
+  const roundMilestones = useMemo<PlayerMilestones[]>(() => {
+    if (!completedRound) return []
+    const out: PlayerMilestones[] = []
+    for (const rp of completedRound.players) {
+      const known = totals.get(rp.player_id)
+      if (!known) continue // totals not loaded (offline): better no milestone than a wrong one
+      const before = { ...EMPTY_TOTALS, ...known, balance: sessionBalances[rp.player_id] ?? 0 }
+      const after = applyRound(before, {
+        won: rp.player_id === completedRound.winnerId,
+        firstOut: rp.was_first_eliminated,
+        revived: rp.was_revived,
+        revivesGiven: rp.revives_given ?? 0,
+        fires: completedRound.fires.filter(f => f.player_id === rp.player_id).length,
+        balanceChange: rp.balance_change ?? 0,
+      })
+      const items = findMilestones(before, after)
+      if (items.length > 0) out.push({ playerId: rp.player_id, name: rp.player?.name ?? '?', items })
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedRound])
 
   // Balances only change when a round ends, is reopened or another device finishes
   // one — not on every tap during a round, so don't refetch the season then.
@@ -403,6 +432,7 @@ export default function SpielPage() {
             winStreaks={winStreaks}
             effects={effects}
             noobSigns={noobSigns}
+            rainClouds={rainClouds}
           />
         </div>
 
@@ -486,6 +516,7 @@ export default function SpielPage() {
           dealerId={dealerId}
           winStreaks={winStreaks}
           noobSigns={noobSigns}
+          rainClouds={rainClouds}
         />
       </div>
 
@@ -590,6 +621,7 @@ export default function SpielPage() {
           }}
           onEndSession={handleEndSessionFromResult}
           firstBlood={completedRound.firstBlood}
+          milestones={roundMilestones}
           storm={stormFor(completedRound.round.stake)}
         />
       )}

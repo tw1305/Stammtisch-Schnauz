@@ -469,3 +469,235 @@ export function NoobSign({ size, state }: { size: number; state: NoobSignState }
     </div>
   )
 }
+
+// =====================================================================
+// Final duel: spotlight on the last two players
+// =====================================================================
+
+type Px = { x: number; y: number }
+
+/** Jagged line from a to b (seeded, so it doesn't jump on re-renders). */
+function duelBoltPath(a: Px, b: Px, gap: number): string {
+  const r = rng(Math.round(a.x * 7 + b.y * 13))
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len = Math.hypot(dx, dy) || 1
+  const [ux, uy] = [dx / len, dy / len]
+  const [nx, ny] = [-uy, ux]
+  const from = { x: a.x + ux * gap, y: a.y + uy * gap }
+  const span = Math.max(0, len - gap * 2)
+  const steps = Math.max(4, Math.round(span / 22))
+  let d = `M${from.x.toFixed(1)},${from.y.toFixed(1)}`
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const off = i === steps ? 0 : (r() - 0.5) * 18
+    d += ` L${(from.x + ux * span * t + nx * off).toFixed(1)},${(from.y + uy * span * t + ny * off).toFixed(1)}`
+  }
+  return d
+}
+
+/**
+ * Final duel: the table dims, two soft spotlights fall on the remaining players,
+ * a lightning bolt crackles between them and a "VS" badge pops up in the middle.
+ * Coordinates are px in the table box; never takes pointer events (eliminated
+ * players stay tappable for a revive).
+ */
+export function FinalDuel({ a, b, avatar, width, height }: { a: Px; b: Px; avatar: number; width: number; height: number }) {
+  const hole = avatar * 1.05
+  const bolt = duelBoltPath(a, b, avatar * 0.62) // seeded: identical on every render
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+  const vs = Math.max(30, avatar * 0.55)
+  return (
+    <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+      <svg className="absolute inset-0 w-full h-full fd-dim" width={width} height={height}>
+        <defs>
+          <radialGradient id="fd-hole">
+            <stop offset="0.55" stopColor="#000" />
+            <stop offset="1" stopColor="#fff" />
+          </radialGradient>
+          <mask id="fd-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
+            <rect width={width} height={height} fill="#fff" />
+            <circle cx={a.x} cy={a.y} r={hole} fill="url(#fd-hole)" />
+            <circle cx={b.x} cy={b.y} r={hole} fill="url(#fd-hole)" />
+          </mask>
+        </defs>
+        <rect width={width} height={height} fill="rgba(8,6,18,0.58)" mask="url(#fd-mask)" />
+        {/* warm light cones on the two finalists */}
+        <circle cx={a.x} cy={a.y} r={hole * 0.95} fill="rgba(255,230,160,0.12)" />
+        <circle cx={b.x} cy={b.y} r={hole * 0.95} fill="rgba(255,230,160,0.12)" />
+        <path d={bolt} className="fd-bolt-glow" fill="none" stroke="rgba(150,180,255,0.55)" strokeWidth="8" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={bolt} className="fd-bolt" pathLength={100} fill="none" stroke="#FFFFFF" strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+      <div
+        className="absolute fd-vs flex items-center justify-center rounded-full font-extrabold text-white"
+        style={{
+          left: mid.x - vs / 2,
+          top: mid.y - vs / 2,
+          width: vs,
+          height: vs,
+          fontSize: vs * 0.42,
+          fontFamily: 'var(--font-display), Georgia, serif',
+          background: 'radial-gradient(circle at 35% 30%, #FF8A3D, #C8243B 70%)',
+          boxShadow: '0 0 0 3px #FFD86B, 0 0 18px rgba(255,120,40,0.85)',
+          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+        }}
+      >
+        VS
+      </div>
+    </div>
+  )
+}
+
+// =====================================================================
+// Band-aids on a revived player
+// =====================================================================
+
+function Plaster({ rot }: { rot: number }) {
+  return (
+    <g transform={`rotate(${rot} 30 30)`}>
+      <rect x="4" y="22" width="52" height="16" rx="8" fill="#E9B98C" stroke="#B07A4E" strokeWidth="1.4" />
+      <rect x="21" y="23.5" width="18" height="13" rx="2.5" fill="#F6DCC0" />
+      {[10, 14, 46, 50].map(x => (
+        <g key={x}>
+          <circle cx={x} cy="27" r="0.9" fill="#B07A4E" />
+          <circle cx={x} cy="33" r="0.9" fill="#B07A4E" />
+        </g>
+      ))}
+    </g>
+  )
+}
+
+/**
+ * Two crossed band-aids on the lower right of the portrait (the dealer badge sits
+ * top left). Render inside the avatar's `relative` box.
+ */
+export function Bandage({ size, faded = false }: { size: number; faded?: boolean }) {
+  const w = Math.max(18, size * 0.46)
+  return (
+    <div
+      className={`absolute pointer-events-none z-20 bd-slap ${faded ? 'opacity-50' : ''}`}
+      style={{ width: w, height: w, right: -w * 0.12, bottom: size * 0.04 }}
+      aria-label="Wiederbelebt"
+      role="img"
+    >
+      <svg viewBox="0 0 60 60" className="w-full h-full overflow-visible" style={{ filter: 'drop-shadow(0 1px 1.5px rgba(60,30,10,0.5))' }}>
+        <Plaster rot={-38} />
+        <Plaster rot={38} />
+      </svg>
+    </div>
+  )
+}
+
+// =====================================================================
+// Rain cloud over a player on a losing streak
+// =====================================================================
+
+/**
+ * Little grey cloud raining over the portrait. `raised` lifts it above a Noob
+ * sign standing on the same portrait. Render inside the avatar's `relative` box.
+ */
+export function RainCloud({ size, raised = false }: { size: number; raised?: boolean }) {
+  const W = Math.max(30, size * 0.78)
+  const lift = raised ? size * 0.5 : -size * 0.04
+  return (
+    <div
+      className="absolute left-1/2 pointer-events-none z-[21]"
+      style={{ width: W, height: W * 0.85, marginLeft: -W / 2, bottom: `calc(100% + ${lift}px)` }}
+      aria-label="Pechsträhne"
+      role="img"
+    >
+      <svg viewBox="0 0 100 85" className="w-full h-full overflow-visible">
+        <g className="rc-bob">
+          {/* drops first, so they fall out from behind the cloud */}
+          {[24, 40, 56, 72].map((x, i) => (
+            <path
+              key={x}
+              className="rc-drop"
+              d={`M${x},46 q-2,7 0,9 q2,-2 0,-9 Z`}
+              fill="#6FA8E8"
+              stroke="#3F78B8"
+              strokeWidth="0.8"
+              style={{ animationDelay: `${i * 0.27}s` }}
+            />
+          ))}
+          <path
+            d="M22,48 C8,48 6,30 20,28 C20,14 40,10 46,20 C52,8 74,10 76,26 C92,26 94,48 78,48 Z"
+            fill="#9AA3AE"
+            stroke="#5E6670"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+          <path d="M28,30 C30,24 38,22 42,26" fill="none" stroke="#C9CFD6" strokeWidth="2.4" strokeLinecap="round" />
+        </g>
+      </svg>
+    </div>
+  )
+}
+
+// =====================================================================
+// Milestones on the result screen
+// =====================================================================
+
+/** Golden ribbon with a sweeping shine, e.g. "🏆 100. Sieg!". */
+export function MilestoneBanner({ icon, text }: { icon: string; text: string }) {
+  return (
+    <span
+      className="ms-banner relative inline-flex items-center gap-1.5 overflow-hidden rounded-full px-3.5 py-1 font-extrabold text-[#4A2E05]"
+      style={{
+        background: 'linear-gradient(180deg, #FFE68A, #E8B330 60%, #C98F14)',
+        boxShadow: '0 0 0 2px #FFF3B0, 0 4px 14px rgba(212,160,30,0.55)',
+      }}
+    >
+      <span aria-hidden="true">{icon}</span>
+      {text}
+      <span className="ms-shine absolute inset-y-0 -left-1/2 w-1/3" aria-hidden="true" />
+    </span>
+  )
+}
+
+const CONFETTI_COLORS = ['#FFD86B', '#E0245E', '#2E7BEA', '#1FAF6A', '#FFFFFF', '#FF8A3D']
+
+/** Short confetti burst from the centre of its box (one-shot, cleans itself up). */
+export function ConfettiBurst({ delay = 0 }: { delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const root = ref.current
+    if (!root || reducedMotion()) return
+    const anims: Animation[] = []
+    root.querySelectorAll<HTMLElement>('[data-c]').forEach((el, i) => {
+      const a = (i / 26) * Math.PI * 2 + Math.random() * 0.4
+      const d = 70 + Math.random() * 90
+      const dx = Math.cos(a) * d
+      const dy = Math.sin(a) * d * 0.7 - 30
+      anims.push(
+        el.animate(
+          [
+            { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+            { transform: `translate(${dx}px, ${dy}px) rotate(${360 + Math.random() * 360}deg)`, opacity: 1, offset: 0.55 },
+            { transform: `translate(${dx * 1.1}px, ${dy + 90}px) rotate(${720}deg)`, opacity: 0 },
+          ],
+          { duration: 1500 + Math.random() * 500, delay: delay * 1000, easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)', fill: 'both' }
+        )
+      )
+    })
+    return () => anims.forEach(x => x.cancel())
+  }, [delay])
+  return (
+    <div ref={ref} className="absolute left-1/2 top-1/2 pointer-events-none" aria-hidden="true">
+      {Array.from({ length: 26 }, (_, i) => (
+        <span
+          key={i}
+          data-c
+          className="absolute block"
+          style={{
+            width: i % 3 ? 7 : 5,
+            height: i % 3 ? 4 : 9,
+            background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+            borderRadius: i % 4 === 0 ? '50%' : 1,
+            opacity: 0,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
