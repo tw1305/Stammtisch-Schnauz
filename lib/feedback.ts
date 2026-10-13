@@ -215,6 +215,8 @@ const FIRE_FILE = '/sounds/fire.wav'
 const FEUERBALL_FILE = '/sounds/feuerball.mp3'
 /** Seconds after the explosion starts: overlaps its fading tail a little. */
 const FEUERBALL_DELAY = 1.7
+/** The clip is quietly recorded (peak −20 dBFS): +50 % keeps it well clear of clipping. */
+const FEUERBALL_GAIN = 1.5
 /** Revive: soldier yelling "MEDIC!" (freesound #800868 by tyranttim), 0.84 s, loud until ~0.6 s. */
 const MEDIC_FILE = '/sounds/medic.wav'
 /** When the syringe (sound + animation) follows the medic call, in ms. */
@@ -481,7 +483,7 @@ export function feedbackFire() {
     if (!src) synthFire()
   })
   // "So ein großer Feuerball, Junge!" — while the explosion dies away (it's loud until ~1.6 s).
-  void playSample(FEUERBALL_FILE, 1, FEUERBALL_DELAY)
+  void playSample(FEUERBALL_FILE, FEUERBALL_GAIN, FEUERBALL_DELAY)
 }
 
 /** Fallback when the recording can't be loaded: ignition whoosh, roaring blaze, crackling embers. */
