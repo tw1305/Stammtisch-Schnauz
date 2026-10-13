@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   getCurrentQuarter,
@@ -12,9 +12,12 @@ import {
 import type { Season, Player, DebtSettlement, Session, Round, RoundPlayer, SessionSummary } from '@/types/database'
 import {
   compareSeasonsDesc,
+  fetchAll,
   fetchByIds,
   loadFires,
+  loadPlayerMap,
   buildSessionSummary,
+  clearStatsCache,
   SUMMARY_RP_SELECT,
   type SummaryRoundPlayer,
 } from '@/lib/stats'
@@ -27,19 +30,88 @@ import { initFeedback, startRecapMusic } from '@/lib/feedback'
 type SeasonWithStats = Season & { roundCount: number; avgStake: number }
 /** `number` is the chronological session number within the season (1 = oldest). */
 type SessionWithRounds = { session: Session; number: number; rounds: Round[]; summary: SessionSummary }
+type SeasonDetail = {
+  balances: { player: Player; total: number }[]
+  settlements: DebtSettlement[]
+  sessions: SessionWithRounds[]
+  playerNames: Record<string, string>
+}
+const EMPTY_DETAIL: SeasonDetail = { balances: [], settlements: [], sessions: [], playerNames: {} }
+
+/**
+ * Season overviews already seen during this visit: opening one again shows it
+ * instantly while it refreshes in the background. Lives outside the component,
+ * so it also survives switching tabs.
+ */
+const detailCache = new Map<string, SeasonDetail>()
+const listCache = new Map<'list', SeasonWithStats[]>()
+
+async function fetchSeasonDetail(supabase: ReturnType<typeof createClient>, seasonId: string): Promise<SeasonDetail> {
+  const [{ data: sessions }, players] = await Promise.all([
+    supabase.from('sessions').select('*').eq('season_id', seasonId).order('started_at', { ascending: true }),
+    loadPlayerMap(supabase),
+  ])
+  const sessionList = (sessions || []) as Session[]
+  if (sessionList.length === 0) return EMPTY_DETAIL
+
+  const allRounds = (
+    await fetchByIds<Round>(supabase, 'rounds', '*', 'session_id', sessionList.map(s => s.id))
+  ).sort((a, b) => a.round_number - b.round_number)
+  const completedRoundIds = allRounds.filter(r => r.status === 'completed').map(r => r.id)
+  // Player rows without the joined player: avatars come once from loadPlayerMap.
+  const [rps, fires] = await Promise.all([
+    fetchByIds<SummaryRoundPlayer>(supabase, 'round_players', SUMMARY_RP_SELECT, 'round_id', completedRoundIds),
+    loadFires(supabase, completedRoundIds),
+  ])
+
+  // Session cards: newest first, but keep the chronological "Session N" numbering.
+  const sessionsData = sessionList
+    .map((s, i) => {
+      const sRounds = allRounds.filter(r => r.session_id === s.id)
+      const realIds = new Set(sRounds.filter(r => r.status === 'completed' && r.round_number > 0).map(r => r.id))
+      return {
+        session: s,
+        number: i + 1,
+        rounds: sRounds,
+        summary: buildSessionSummary(
+          realIds.size,
+          rps.filter(rp => realIds.has(rp.round_id)),
+          fires.filter(f => realIds.has(f.round_id)),
+          players
+        ),
+      }
+    })
+    .reverse()
+
+  const balMap: Record<string, { player: Player; total: number }> = {}
+  for (const rp of rps) {
+    const p = players.get(rp.player_id)
+    if (!p) continue
+    if (!balMap[rp.player_id]) balMap[rp.player_id] = { player: p, total: 0 }
+    if (rp.balance_change != null) balMap[rp.player_id].total += rp.balance_change
+  }
+  const balances = Object.values(balMap).sort((a, b) => b.total - a.total)
+  return {
+    balances,
+    settlements: calculateSettlements(balances),
+    sessions: sessionsData,
+    playerNames: Object.fromEntries([...players.values()].map(p => [p.id, p.name])),
+  }
+}
 
 export default function SeasonsPage() {
   const supabase = createClient()
-  const [seasons, setSeasons] = useState<SeasonWithStats[]>([])
-  const [loading, setLoading] = useState(true)
+  const [seasons, setSeasons] = useState<SeasonWithStats[]>(() => listCache.get('list') ?? [])
+  const [loading, setLoading] = useState(() => !listCache.has('list'))
+  const [detailLoading, setDetailLoading] = useState(false)
+  // Only the newest detail request may write its result (fast season switching).
+  const detailRequest = useRef(0)
   const [showNewForm, setShowNewForm] = useState(false)
   const [newName, setNewName] = useState(getCurrentQuarter())
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split('T')[0])
   const [detailSeason, setDetailSeason] = useState<Season | null>(null)
-  const [settlements, setSettlements] = useState<DebtSettlement[]>([])
-  const [seasonBalances, setSeasonBalances] = useState<{ player: Player; total: number }[]>([])
-  const [sessionsData, setSessionsData] = useState<SessionWithRounds[]>([])
-  const [playerNames, setPlayerNames] = useState<Record<string, string>>({}) // for round winners
+  const [detail, setDetail] = useState<SeasonDetail>(EMPTY_DETAIL)
+  const { balances: seasonBalances, settlements, sessions: sessionsData, playerNames } = detail
   const [editingRound, setEditingRound] = useState<Round | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
@@ -74,31 +146,29 @@ export default function SeasonsPage() {
   }
 
   async function loadSeasons() {
-    setLoading(true)
-    const { data } = await supabase
-      .from('seasons')
-      .select('*')
-
-    const enriched: SeasonWithStats[] = []
-    for (const s of (data || []).sort(compareSeasonsDesc)) {
-      const { data: sessions } = await supabase.from('sessions').select('id').eq('season_id', s.id)
-      const sessionIds = sessions?.map(x => x.id) || []
-      let roundCount = 0
-      let avgStake = 0
-      if (sessionIds.length > 0) {
-        const { data: rounds } = await supabase
-          .from('rounds')
-          .select('stake')
-          .in('session_id', sessionIds)
-          .eq('status', 'completed')
-          .gt('round_number', 0)
-        roundCount = rounds?.length || 0
-        avgStake = roundCount > 0
-          ? Math.round((rounds || []).reduce((a, r) => a + r.stake, 0) / roundCount * 10) / 10
-          : 0
-      }
-      enriched.push({ ...s, roundCount, avgStake })
+    // 3 queries for the whole list instead of 2 per season, one after another.
+    const [{ data }, sessions, rounds] = await Promise.all([
+      supabase.from('seasons').select('*'),
+      fetchAll<{ id: string; season_id: string }>(supabase, 'sessions', 'id, season_id'),
+      fetchAll<{ session_id: string; stake: number }>(supabase, 'rounds', 'session_id, stake', q =>
+        q.eq('status', 'completed').gt('round_number', 0)
+      ),
+    ])
+    const seasonOf = new Map(sessions.map(x => [x.id, x.season_id]))
+    const agg = new Map<string, { n: number; sum: number }>()
+    for (const r of rounds) {
+      const sid = seasonOf.get(r.session_id)
+      if (!sid) continue
+      const cur = agg.get(sid) ?? { n: 0, sum: 0 }
+      cur.n++
+      cur.sum += r.stake
+      agg.set(sid, cur)
     }
+    const enriched: SeasonWithStats[] = (data || []).sort(compareSeasonsDesc).map(season => {
+      const cur = agg.get(season.id)
+      return { ...season, roundCount: cur?.n ?? 0, avgStake: cur ? Math.round((cur.sum / cur.n) * 10) / 10 : 0 }
+    })
+    listCache.set('list', enriched)
     setSeasons(enriched)
     setLoading(false)
   }
@@ -152,76 +222,35 @@ export default function SeasonsPage() {
   }
 
   async function loadSeasonDetail(season: Season) {
+    const req = ++detailRequest.current
     setDetailSeason(season)
-
-    const { data: sessions } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('season_id', season.id)
-      .order('started_at', { ascending: true })
-
-    const sessionList = sessions || []
-    const sessionIds = sessionList.map(s => s.id)
-
-    if (sessionIds.length === 0) {
-      setSeasonBalances([]); setSettlements([]); setSessionsData([])
-      return
+    // Never show the season we came from: cached data of this season, or empty + "Laden…".
+    const cached = detailCache.get(season.id)
+    setDetail(cached ?? EMPTY_DETAIL)
+    setDetailLoading(!cached)
+    try {
+      const fresh = await fetchSeasonDetail(supabase, season.id)
+      detailCache.set(season.id, fresh)
+      if (req !== detailRequest.current) return // the user moved on meanwhile
+      setDetail(fresh)
+    } finally {
+      if (req === detailRequest.current) setDetailLoading(false)
     }
+  }
 
-    const { data: rounds } = await supabase
-      .from('rounds')
-      .select('*')
-      .in('session_id', sessionIds)
-      .order('round_number', { ascending: true })
-
-    const allRounds = rounds || []
-    const completedRoundIds = allRounds.filter(r => r.status === 'completed').map(r => r.id)
-    const rps = await fetchByIds<SummaryRoundPlayer>(supabase, 'round_players', SUMMARY_RP_SELECT, 'round_id', completedRoundIds)
-    const fires = await loadFires(supabase, completedRoundIds)
-
-    // Session cards: newest first, but keep the chronological "Session N" numbering.
-    setSessionsData(
-      sessionList
-        .map((s, i) => {
-          const sRounds = allRounds.filter(r => r.session_id === s.id)
-          const realIds = new Set(sRounds.filter(r => r.status === 'completed' && r.round_number > 0).map(r => r.id))
-          return {
-            session: s,
-            number: i + 1,
-            rounds: sRounds,
-            summary: buildSessionSummary(
-              realIds.size,
-              rps.filter(rp => realIds.has(rp.round_id)),
-              fires.filter(f => realIds.has(f.round_id))
-            ),
-          }
-        })
-        .reverse()
-    )
-
-    if (completedRoundIds.length === 0) {
-      setSeasonBalances([]); setSettlements([])
-      return
-    }
-
-    const balMap: Record<string, { player: Player; total: number }> = {}
-    for (const rp of rps) {
-      const p = rp.player as unknown as Player
-      if (!p) continue
-      if (!balMap[rp.player_id]) balMap[rp.player_id] = { player: p, total: 0 }
-      if (rp.balance_change != null) balMap[rp.player_id].total += rp.balance_change
-    }
-    setPlayerNames(Object.fromEntries(Object.values(balMap).map(b => [b.player.id, b.player.name])))
-    const bals = Object.values(balMap).sort((a, b) => b.total - a.total)
-    setSeasonBalances(bals)
-    setSettlements(calculateSettlements(bals))
+  /** After editing data: drop cached results so the overview and statistics recompute. */
+  function invalidate() {
+    detailCache.clear()
+    clearStatsCache()
   }
 
   async function deleteRound(round: Round) {
     if (!confirm('Runde löschen? Die Bilanzen werden entsprechend angepasst.')) return
     await supabase.from('round_players').delete().eq('round_id', round.id)
     await supabase.from('rounds').delete().eq('id', round.id)
+    invalidate()
     if (detailSeason) loadSeasonDetail(detailSeason)
+    loadSeasons()
   }
 
   async function deleteSession(session: Session) {
@@ -233,6 +262,7 @@ export default function SeasonsPage() {
     await supabase.from('rounds').delete().eq('session_id', session.id)
     await supabase.from('session_players').delete().eq('session_id', session.id)
     await supabase.from('sessions').delete().eq('id', session.id)
+    invalidate()
     if (detailSeason) loadSeasonDetail(detailSeason)
     loadSeasons()
   }
@@ -247,7 +277,7 @@ export default function SeasonsPage() {
       <div className="flex flex-col max-w-md mx-auto w-full">
         <div className="flex items-center gap-2 px-3 pt-5 pb-3">
           <button
-            onClick={() => setDetailSeason(null)}
+            onClick={() => { detailRequest.current++; setDetailSeason(null) }}
             className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#FFFDF7] text-[#23201A] text-2xl transition-colors"
           >
             ‹
@@ -310,7 +340,7 @@ export default function SeasonsPage() {
             <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Saisonbilanz</p>
             <div className="bg-[#FBF6EA] rounded-2xl border border-[#E4D9BF] overflow-hidden">
               {seasonBalances.length === 0 ? (
-                <p className="text-[#7C7461] text-sm text-center py-6">Noch keine Daten</p>
+                <p className="text-[#7C7461] text-sm text-center py-6">{detailLoading ? 'Laden…' : 'Noch keine Daten'}</p>
               ) : (
                 seasonBalances.map(b => (
                   <div key={b.player.id} className="flex items-center justify-between px-4 py-3 border-b border-[#E4D9BF] last:border-0">
@@ -346,7 +376,7 @@ export default function SeasonsPage() {
             <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Sessions & Runden</p>
             <div className="space-y-3">
               {sessionsData.length === 0 ? (
-                <p className="text-[#7C7461] text-sm text-center py-4">Keine Sessions</p>
+                <p className="text-[#7C7461] text-sm text-center py-4">{detailLoading ? 'Laden…' : 'Keine Sessions'}</p>
               ) : (
                 sessionsData.map(({ session, number, rounds, summary }) => {
                   const isOpen = openSessions.has(session.id)
@@ -472,7 +502,12 @@ export default function SeasonsPage() {
           <RoundEditor
             round={editingRound}
             onClose={() => setEditingRound(null)}
-            onSaved={() => { setEditingRound(null); if (detailSeason) loadSeasonDetail(detailSeason) }}
+            onSaved={() => {
+              setEditingRound(null)
+              invalidate()
+              if (detailSeason) loadSeasonDetail(detailSeason)
+              loadSeasons()
+            }}
           />
         )}
 
@@ -599,11 +634,11 @@ function RoundEditor({
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const { data } = await supabase
-        .from('round_players')
-        .select('*, player:players(*)')
-        .eq('round_id', round.id)
-      const rps = (data || []) as RoundPlayer[]
+      const [{ data }, players] = await Promise.all([
+        supabase.from('round_players').select('*').eq('round_id', round.id),
+        loadPlayerMap(supabase),
+      ])
+      const rps = ((data || []) as RoundPlayer[]).map(rp => ({ ...rp, player: players.get(rp.player_id) }))
 
       // Season-wide cumulative balance entering this round: sum of every
       // completed round in the season that happened before it.

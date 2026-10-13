@@ -6,6 +6,7 @@ import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
 import AvatarCropper from '@/components/ui/AvatarCropper'
 import { formatBirthday, normalizeBirthday, maskBirthdayInput } from '@/lib/birthday'
+import { clearStatsCache } from '@/lib/stats'
 import type { Player } from '@/types/database'
 
 function readFile(file: File): Promise<string> {
@@ -27,6 +28,7 @@ export default function SpielerPage() {
   useEffect(() => { loadPlayers() }, [])
 
   async function loadPlayers() {
+    clearStatsCache() // names/avatars may just have changed
     const { data } = await supabase.from('players').select('*').order('name')
     setPlayers(data || [])
     setLoading(false)

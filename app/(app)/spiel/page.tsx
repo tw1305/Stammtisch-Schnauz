@@ -14,7 +14,7 @@ import SessionEndModal, { type SeasonSummary } from '@/components/ui/SessionEndM
 import type { SessionSummary } from '@/components/ui/SessionSummaryModal'
 import PlayerAvatar from '@/components/ui/PlayerAvatar'
 import Portal from '@/components/ui/Portal'
-import { computeSessionSummary, computeWinStreaks } from '@/lib/stats'
+import { computeSessionSummary, computeWinStreaks, fetchByIds, loadPlayerMap, clearStatsCache } from '@/lib/stats'
 import {
   feedbackEliminate,
   feedbackRevive,
@@ -255,14 +255,15 @@ export default function SpielPage() {
     const roundIds = (rounds || []).map(r => r.id)
     if (roundIds.length === 0) return { name: season.name, startDate: season.start_date, players: [] }
 
-    const { data: rps } = await supabase
-      .from('round_players')
-      .select('player_id, balance_change, player:players(id, name, avatar_url, is_active, created_at)')
-      .in('round_id', roundIds)
+    // No player join: avatars are big, they come once from the shared players cache.
+    const [rps, players] = await Promise.all([
+      fetchByIds<{ player_id: string; balance_change: number | null }>(supabase, 'round_players', 'id, player_id, balance_change', 'round_id', roundIds),
+      loadPlayerMap(supabase),
+    ])
 
     const map: Record<string, { player: Player; total: number }> = {}
-    for (const rp of rps || []) {
-      const p = rp.player as unknown as Player
+    for (const rp of rps) {
+      const p = players.get(rp.player_id)
       if (!p) continue
       if (!map[rp.player_id]) map[rp.player_id] = { player: p, total: 0 }
       if (rp.balance_change != null) map[rp.player_id].total += rp.balance_change
@@ -273,9 +274,12 @@ export default function SpielPage() {
   // Shared end-of-session flow: build both overviews, close the session, show the modal.
   async function endSessionFlow() {
     if (!session) return
-    const sessionSummary = await computeSessionSummary(supabase, session.id)
-    const seasonSummary = activeSeason ? await buildSeasonSummary(activeSeason.id) : null
+    const [sessionSummary, seasonSummary] = await Promise.all([
+      computeSessionSummary(supabase, session.id),
+      activeSeason ? buildSeasonSummary(activeSeason.id) : Promise.resolve(null),
+    ])
     await endSession()
+    clearStatsCache() // statistics opened next must include tonight's rounds
     setEndData({ session: sessionSummary, season: seasonSummary })
     reload()
   }

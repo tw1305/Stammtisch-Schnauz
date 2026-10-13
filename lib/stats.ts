@@ -18,22 +18,94 @@ export async function fetchByIds<T>(
   column: string,
   ids: string[]
 ): Promise<T[]> {
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += ID_CHUNK) chunks.push(ids.slice(i, i + ID_CHUNK))
+  // Chunks load in parallel; pages within a chunk follow each other.
+  const parts = await Promise.all(
+    chunks.map(async chunk => {
+      const rows: T[] = []
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from(table)
+          .select(select)
+          .in(column, chunk)
+          .order('id')
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        rows.push(...((data || []) as T[]))
+        if (!data || data.length < PAGE) break
+      }
+      return rows
+    })
+  )
+  return parts.flat()
+}
+
+/** Every row of `table` (paged past the 1000-row cap), optionally narrowed by `filter`. */
+export async function fetchAll<T>(
+  supabase: Supa,
+  table: string,
+  select: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter: (q: any) => any = q => q
+): Promise<T[]> {
   const out: T[] = []
-  for (let i = 0; i < ids.length; i += ID_CHUNK) {
-    const chunk = ids.slice(i, i + ID_CHUNK)
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await supabase
-        .from(table)
-        .select(select)
-        .in(column, chunk)
-        .order('id')
-        .range(from, from + PAGE - 1)
-      if (error) throw error
-      out.push(...((data || []) as T[]))
-      if (!data || data.length < PAGE) break
-    }
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await filter(supabase.from(table).select(select)).order('id').range(from, from + PAGE - 1)
+    if (error) throw error
+    out.push(...((data || []) as T[]))
+    if (!data || data.length < PAGE) break
   }
   return out
+}
+
+// ---------- Short-lived request cache ----------
+
+/**
+ * Statistics fire many identical queries at once (key figures, player stats and
+ * the achievement tally all need the same rounds). Results are shared for a few
+ * seconds per client — real and test DB never mix — so each query runs once.
+ */
+let memoStore = new WeakMap<object, Map<string, { at: number; p: Promise<unknown> }>>()
+const MEMO_MS = 10_000
+
+function memo<T>(supabase: Supa, key: string, fn: () => Promise<T>, ttl = MEMO_MS): Promise<T> {
+  let store = memoStore.get(supabase)
+  if (!store) memoStore.set(supabase, (store = new Map()))
+  const hit = store.get(key)
+  if (hit && Date.now() - hit.at < ttl) return hit.p as Promise<T>
+  const p = fn()
+  store.set(key, { at: Date.now(), p })
+  p.catch(() => store.delete(key))
+  return p
+}
+
+/** Drops all cached query results (call after changing players or game data). */
+export function clearStatsCache() {
+  memoStore = new WeakMap()
+}
+
+/**
+ * All players incl. their avatars, loaded once and shared for 5 minutes (the
+ * Spieler page clears the cache whenever players are edited).
+ * Avatars are base64 images (~50 KB each), so they must never be joined into
+ * per-round rows — look players up here instead.
+ */
+export function loadPlayers(supabase: Supa): Promise<Player[]> {
+  return memo(
+    supabase,
+    'players',
+    async () => {
+      const { data, error } = await supabase.from('players').select('*').order('name')
+      if (error) throw error
+      return (data || []) as Player[]
+    },
+    5 * 60_000
+  )
+}
+
+export async function loadPlayerMap(supabase: Supa): Promise<Map<string, Player>> {
+  return new Map((await loadPlayers(supabase)).map(p => [p.id, p]))
 }
 
 /** Fires for the given rounds; empty when the round_fires migration hasn't run yet. */
@@ -97,7 +169,11 @@ type ScopeRound = {
   status: string
 }
 
-async function roundIdsForScope(supabase: Supa, seasonId?: string | null): Promise<ScopeRound[]> {
+function roundIdsForScope(supabase: Supa, seasonId?: string | null): Promise<ScopeRound[]> {
+  return memo(supabase, `rounds:${seasonId ?? 'all'}`, () => loadScopeRounds(supabase, seasonId))
+}
+
+async function loadScopeRounds(supabase: Supa, seasonId?: string | null): Promise<ScopeRound[]> {
   const select = 'id, session_id, round_number, winner_id, started_at, stake, status'
   let rounds: ScopeRound[]
   if (seasonId && seasonId !== 'all') {
@@ -106,14 +182,31 @@ async function roundIdsForScope(supabase: Supa, seasonId?: string | null): Promi
     if (sessionIds.length === 0) return []
     rounds = await fetchByIds<ScopeRound>(supabase, 'rounds', select, 'session_id', sessionIds)
   } else {
-    rounds = []
-    for (let from = 0; ; from += PAGE) {
-      const { data } = await supabase.from('rounds').select(select).order('id').range(from, from + PAGE - 1)
-      rounds.push(...((data || []) as ScopeRound[]))
-      if (!data || data.length < PAGE) break
-    }
+    rounds = await fetchAll<ScopeRound>(supabase, 'rounds', select)
   }
   return rounds.filter(r => r.status === 'completed')
+}
+
+type ScopeRoundPlayer = {
+  round_id: string
+  player_id: string
+  is_winner: boolean
+  was_first_eliminated: boolean
+  was_revived: boolean
+  revives_given: number | null
+  reached_final: boolean
+  balance_change: number | null
+}
+
+/** Player rows of all completed rounds in scope (shared by key figures and player stats). */
+function scopeRoundPlayers(supabase: Supa, seasonId: string | null | undefined, rounds: ScopeRound[]) {
+  return memo(supabase, `rps:${seasonId ?? 'all'}`, () =>
+    fetchByIds<ScopeRoundPlayer>(supabase, 'round_players', '*', 'round_id', rounds.map(r => r.id))
+  )
+}
+
+function scopeFires(supabase: Supa, seasonId: string | null | undefined, rounds: ScopeRound[]) {
+  return memo(supabase, `fires:${seasonId ?? 'all'}`, () => loadFires(supabase, rounds.map(r => r.id)))
 }
 
 /**
@@ -121,13 +214,16 @@ async function roundIdsForScope(supabase: Supa, seasonId?: string | null): Promi
  * least one real round, average stake, average players per round and fires within the scope.
  */
 export async function computeScopeSummary(supabase: Supa, seasonId?: string | null): Promise<ScopeSummary> {
-  const real = (await roundIdsForScope(supabase, seasonId)).filter(r => r.round_number > 0)
+  const rounds = await roundIdsForScope(supabase, seasonId)
+  const real = rounds.filter(r => r.round_number > 0)
   if (real.length === 0) return { rounds: 0, sessions: 0, avg_stake: 0, avg_players: 0, fires: 0 }
-  const ids = real.map(r => r.id)
-  const seats = (
-    await fetchByIds<{ id: string }>(supabase, 'round_players', 'id', 'round_id', ids)
-  ).length
-  const fires = (await loadFires(supabase, ids)).length
+  const realIds = new Set(real.map(r => r.id))
+  const [rps, allFires] = await Promise.all([
+    scopeRoundPlayers(supabase, seasonId, rounds),
+    scopeFires(supabase, seasonId, rounds),
+  ])
+  const seats = rps.filter(rp => realIds.has(rp.round_id)).length
+  const fires = allFires.filter(f => realIds.has(f.round_id)).length
   return {
     rounds: real.length,
     sessions: new Set(real.map(r => r.session_id)).size,
@@ -181,13 +277,11 @@ export async function computePlayerStats(
   supabase: Supa,
   opts: { seasonId?: string | null; playerIds?: string[] } = {}
 ): Promise<PlayerStats[]> {
-  let pq = supabase.from('players').select('*').order('name')
-  if (opts.playerIds) pq = pq.in('id', opts.playerIds)
-  else pq = pq.eq('is_active', true)
-  const { data: players } = await pq
-  if (!players || players.length === 0) return []
+  const [allPlayers, rounds] = await Promise.all([loadPlayers(supabase), roundIdsForScope(supabase, opts.seasonId)])
+  const wanted = opts.playerIds ? new Set(opts.playerIds) : null
+  const players = allPlayers.filter(p => (wanted ? wanted.has(p.id) : p.is_active))
+  if (players.length === 0) return []
 
-  const rounds = await roundIdsForScope(supabase, opts.seasonId)
   const statsMap: Record<string, PlayerStats> = {}
   for (const p of players) statsMap[p.id] = emptyStats(p)
 
@@ -204,20 +298,13 @@ export async function computePlayerStats(
     { round_number: number; winner_id: string | null; started_at: string; stake: number }
   > = {}
   for (const r of rounds) roundMeta[r.id] = r
-  const roundIds = rounds.map(r => r.id)
 
-  const rps = await fetchByIds<{
-    round_id: string
-    player_id: string
-    is_winner: boolean
-    was_first_eliminated: boolean
-    was_revived: boolean
-    revives_given: number | null
-    reached_final: boolean
-    balance_change: number | null
-  }>(supabase, 'round_players', '*', 'round_id', roundIds)
+  const [rps, fires] = await Promise.all([
+    scopeRoundPlayers(supabase, opts.seasonId, rounds),
+    scopeFires(supabase, opts.seasonId, rounds),
+  ])
 
-  for (const f of await loadFires(supabase, roundIds)) {
+  for (const f of fires) {
     if (statsMap[f.player_id]) statsMap[f.player_id].fires++
   }
 
@@ -358,8 +445,9 @@ export async function computeSeasonAchievements(
   const counts: Record<string, Record<string, number>> = {}
   const best: Record<string, Record<string, number>> = {}
 
-  for (const season of seasons || []) {
-    const stats = await computePlayerStats(supabase, { seasonId: season.id })
+  // Seasons are independent: compute them all at once instead of one after another.
+  const perSeason = await Promise.all((seasons || []).map(season => computePlayerStats(supabase, { seasonId: season.id })))
+  for (const stats of perSeason) {
     const badges = deriveBadges(stats)
     for (const [pid, list] of Object.entries(badges)) {
       for (const b of list) {
@@ -404,20 +492,22 @@ export async function computeSessionSummary(
   const roundIds = (rounds || []).map(r => r.id)
   if (roundIds.length === 0) return { rounds: 0, players: [] }
 
-  const rps = await fetchByIds<SummaryRoundPlayer>(supabase, 'round_players', SUMMARY_RP_SELECT, 'round_id', roundIds)
-  return buildSessionSummary(roundIds.length, rps, await loadFires(supabase, roundIds))
+  const [rps, fires, players] = await Promise.all([
+    fetchByIds<SummaryRoundPlayer>(supabase, 'round_players', SUMMARY_RP_SELECT, 'round_id', roundIds),
+    loadFires(supabase, roundIds),
+    loadPlayerMap(supabase),
+  ])
+  return buildSessionSummary(roundIds.length, rps, fires, players)
 }
 
-/** round_players columns needed by buildSessionSummary (incl. the joined player). */
-export const SUMMARY_RP_SELECT =
-  'id, round_id, player_id, balance_change, is_winner, player:players(id, name, avatar_url, is_active, created_at, birthday)'
+/** round_players columns needed by buildSessionSummary (players come from loadPlayerMap, not a join). */
+export const SUMMARY_RP_SELECT = 'id, round_id, player_id, balance_change, is_winner'
 
 export type SummaryRoundPlayer = {
   round_id: string
   player_id: string
   balance_change: number | null
   is_winner: boolean
-  player: unknown
 }
 
 /**
@@ -427,11 +517,12 @@ export type SummaryRoundPlayer = {
 export function buildSessionSummary(
   roundCount: number,
   rps: SummaryRoundPlayer[],
-  fires: { player_id: string }[]
+  fires: { player_id: string }[],
+  players: Map<string, Player>
 ): SessionSummary {
   const map: Record<string, { player: Player; balance: number; wins: number; fires: number }> = {}
   for (const rp of rps) {
-    const p = rp.player as Player | null
+    const p = players.get(rp.player_id)
     if (!p) continue
     if (!map[rp.player_id]) map[rp.player_id] = { player: p, balance: 0, wins: 0, fires: 0 }
     if (rp.balance_change != null) map[rp.player_id].balance += rp.balance_change
@@ -533,9 +624,12 @@ export async function computeHeadToHead(supabase: Supa, playerId: string): Promi
 
   const otherIds = Object.keys(acc)
   if (otherIds.length === 0) return []
-  const { data: players } = await supabase.from('players').select('*').in('id', otherIds)
+  const all = await loadPlayerMap(supabase)
   const playerMap: Record<string, Player> = {}
-  for (const p of players || []) playerMap[p.id] = p as Player
+  for (const id of otherIds) {
+    const p = all.get(id)
+    if (p) playerMap[id] = p
+  }
 
   return otherIds
     .filter(id => playerMap[id])

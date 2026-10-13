@@ -27,6 +27,15 @@ const SORTS: { key: string; label: string; get: (s: PlayerStats) => number }[] =
 /** Achievement icons shown inline in a collapsed row before collapsing into "+X". */
 const MAX_INLINE_BADGES = 4
 
+/**
+ * Results already computed during this visit (per season / "all"), so switching
+ * back is instant while a fresh copy loads in the background. Outside the
+ * component, so they survive switching tabs.
+ */
+const resultCache = new Map<string, { stats: PlayerStats[]; scope: ScopeSummary }>()
+const pageCache = new Map<'seasons', { list: Season[]; initial: string }>()
+const tallyCache = new Map<'tally', Record<string, AchievementTally[]>>()
+
 function rankColor(i: number): string {
   if (i === 0) return '#D4AF37'
   if (i === 1) return '#9CA3AA'
@@ -36,15 +45,18 @@ function rankColor(i: number): string {
 
 export default function StatistikenPage() {
   const supabase = createClient()
-  const [seasons, setSeasons] = useState<Season[]>([])
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('all')
+  const [seasons, setSeasons] = useState<Season[]>(() => pageCache.get('seasons')?.list ?? [])
+  // null until the seasons are known, so the page doesn't first compute "Alle Seasons" for nothing.
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(() => pageCache.get('seasons')?.initial ?? null)
   const [sortKey, setSortKey] = useState<string>('balance')
-  const [stats, setStats] = useState<PlayerStats[]>([])
-  const [loading, setLoading] = useState(true)
+  const first = pageCache.get('seasons')?.initial
+  const cachedFirst = first ? resultCache.get(first) : undefined
+  const [stats, setStats] = useState<PlayerStats[]>(() => cachedFirst?.stats ?? [])
+  const [loading, setLoading] = useState(() => !cachedFirst)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [tally, setTally] = useState<Record<string, AchievementTally[]>>({})
+  const [tally, setTally] = useState<Record<string, AchievementTally[]>>(() => tallyCache.get('tally') ?? {})
   const [showInfo, setShowInfo] = useState(false)
-  const [scope, setScope] = useState<ScopeSummary | null>(null)
+  const [scope, setScope] = useState<ScopeSummary | null>(() => cachedFirst?.scope ?? null)
 
   function toggle(id: string) {
     setExpanded(prev => {
@@ -58,28 +70,36 @@ export default function StatistikenPage() {
   useEffect(() => { loadSeasons(); loadTally() }, [])
   const seasonRef = useRef(selectedSeasonId)
   seasonRef.current = selectedSeasonId
-  useEffect(() => { loadStats() }, [selectedSeasonId])
+  useEffect(() => { if (selectedSeasonId) loadStats(selectedSeasonId) }, [selectedSeasonId])
 
   async function loadSeasons() {
     // Oldest → newest, so the dropdown reads "Alle Seasons" then chronological.
     const { data } = await supabase.from('seasons').select('*')
-    setSeasons((data || []).sort(compareSeasonsDesc).reverse())
+    const list = (data || []).sort(compareSeasonsDesc).reverse()
     // Default to the currently active season when there is one.
-    const active = (data || []).find(s => s.status === 'active')
-    if (active) setSelectedSeasonId(active.id)
+    const initial = list.find(s => s.status === 'active')?.id ?? 'all'
+    pageCache.set('seasons', { list, initial })
+    setSeasons(list)
+    setSelectedSeasonId(cur => cur ?? initial)
   }
 
   async function loadTally() {
-    setTally(await computeSeasonAchievements(supabase))
+    const result = await computeSeasonAchievements(supabase)
+    tallyCache.set('tally', result)
+    setTally(result)
   }
 
-  async function loadStats() {
-    setLoading(true)
-    const seasonId = selectedSeasonId
+  async function loadStats(seasonId: string) {
+    // Show what we already have for this season right away (never the previous season's numbers).
+    const cached = resultCache.get(seasonId)
+    setStats(cached?.stats ?? [])
+    setScope(cached?.scope ?? null)
+    setLoading(!cached)
     const [result, summary] = await Promise.all([
       computePlayerStats(supabase, { seasonId }),
       computeScopeSummary(supabase, seasonId),
     ])
+    resultCache.set(seasonId, { stats: result, scope: summary })
     // Ignore a stale response if the selection changed while loading.
     if (seasonRef.current !== seasonId) return
     setStats(result)
@@ -110,7 +130,7 @@ export default function StatistikenPage() {
         </div>
         <div className="flex gap-2">
           <select
-            value={selectedSeasonId}
+            value={selectedSeasonId ?? ''}
             onChange={e => setSelectedSeasonId(e.target.value)}
             className="flex-1 min-w-0 bg-[#FBF6EA] border border-[#E4D9BF] rounded-xl px-3 py-2 text-[#23201A] text-sm outline-none focus:border-[#2E6B3A]"
           >
