@@ -5,25 +5,56 @@ import Portal from './Portal'
 import { getFireSprites, FIRE_SPRITE_STEPS } from './fireSprites'
 
 /** A short one-shot animation anchored on a player at the table. */
-export type EffectKind = 'rip' | 'revive' | 'fire'
+/** 'medic' = the "MEDIC!" call before a revive: the avatar shakes, then the syringe ('revive') follows. */
+export type EffectKind = 'rip' | 'medic' | 'revive' | 'fire'
 export type GameEffect = {
   id: number
   kind: EffectKind
   playerId: string
   /** revive: who gave the revive — the syringe flies from their seat */
   fromPlayerId?: string
-  /** revive: keep the target greyed out until the syringe has injected */
+  /** medic/revive: keep the target greyed out until the syringe has injected */
   holdGray?: boolean
 }
 
-/** How long each effect stays mounted (ms) — matches the CSS animation lengths. */
-export const EFFECT_DURATION: Record<EffectKind, number> = { rip: 1900, revive: 2300, fire: 1600 }
+/**
+ * How long each effect stays mounted (ms) — matches the CSS animation lengths.
+ * medic outlasts MEDIC_MS (when the syringe starts) a little, so the target never
+ * flashes back to colour between the two effects.
+ */
+export const EFFECT_DURATION: Record<EffectKind, number> = { rip: 1900, medic: 800, revive: 2300, fire: 1600 }
 
 /** Renders one effect centred on an avatar of the given size. */
-export function PlayerEffect({ kind, size }: { kind: EffectKind; size: number }) {
+/** Which way an effect may overflow: seats at the screen edge point their bubble inward. */
+export type EffectAlign = 'left' | 'center' | 'right'
+
+export function PlayerEffect({ kind, size, align = 'center' }: { kind: EffectKind; size: number; align?: EffectAlign }) {
   if (kind === 'rip') return <Tombstone size={size} />
+  if (kind === 'medic') return <MedicCall size={size} align={align} />
   if (kind === 'revive') return <HealPulse size={size} />
   return <FireExplosion size={size} />
+}
+
+// ---------- "MEDIC!" call (the avatar itself shakes via .fx-shake in GameTable) ----------
+
+function MedicCall({ size, align }: { size: number; align: EffectAlign }) {
+  const fs = Math.max(11, Math.round(size * 0.2))
+  // Anchor the bubble so it grows towards the table centre instead of off-screen.
+  const anchor: React.CSSProperties =
+    align === 'right' ? { right: 0 } : align === 'left' ? { left: 0 } : { left: '50%', transform: 'translateX(-50%)' }
+  const tail = align === 'right' ? { right: size * 0.25 } : align === 'left' ? { left: size * 0.25 } : { left: '50%', marginLeft: -6 }
+  return (
+    <div className="absolute bottom-full whitespace-nowrap pointer-events-none" style={{ ...anchor, marginBottom: size * 0.06 }} aria-hidden="true">
+      <div
+        className="fx-medic relative rounded-full bg-white px-[0.6em] py-[0.15em] font-extrabold tracking-wide shadow-lg border-2 border-[#C8443B] text-[#C8443B]"
+        style={{ fontSize: fs, transformOrigin: align === 'right' ? '90% 100%' : align === 'left' ? '10% 100%' : '50% 100%' }}
+      >
+        <span className="mr-[0.25em]">✚</span>MEDIC!
+        {/* bubble tail pointing at the avatar */}
+        <span className="absolute -bottom-[7px] w-3 h-3 rotate-45 bg-white border-r-2 border-b-2 border-[#C8443B]" style={tail} />
+      </div>
+    </div>
+  )
 }
 
 // ---------- R.I.P. tombstone ----------

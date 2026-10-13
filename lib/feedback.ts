@@ -215,6 +215,10 @@ const FIRE_FILE = '/sounds/fire.wav'
 const FEUERBALL_FILE = '/sounds/feuerball.mp3'
 /** Seconds after the explosion starts: overlaps its fading tail a little. */
 const FEUERBALL_DELAY = 1.7
+/** Revive: soldier yelling "MEDIC!" (freesound #800868 by tyranttim), 0.84 s, loud until ~0.6 s. */
+const MEDIC_FILE = '/sounds/medic.wav'
+/** When the syringe (sound + animation) follows the medic call, in ms. */
+export const MEDIC_MS = 650
 /** Round won: one of these clips at random (cut by the user, fade-outs included). */
 const WIN_FILES = [
   '/sounds/win/cant-be-touched.mp3', // Body Head Bangerz – Can't Be Touched
@@ -257,7 +261,7 @@ function loadSample(url: string): Promise<AudioBuffer | null> {
 function preloadSounds() {
   if (preloaded) return
   preloaded = true
-  for (const url of [...FART_FILES, FIRE_FILE, FEUERBALL_FILE]) void loadSample(url)
+  for (const url of [...FART_FILES, FIRE_FILE, FEUERBALL_FILE, MEDIC_FILE]) void loadSample(url)
   // Win songs are bigger: only the one that plays next is fetched and decoded ahead.
   pickNextWin()
 }
@@ -453,17 +457,20 @@ export function feedbackEliminate() {
   })
 }
 
-/** Player revived: injection hiss + rising sparkle arpeggio. */
+/** Player revived: a soldier yells "MEDIC!", then injection hiss + rising sparkle arpeggio. */
 export function feedbackRevive() {
-  vib([60, 60, 60, 60, 140])
+  // Long buzz while the soldier yells, then the syringe pulses.
+  vib([400, MEDIC_MS - 400, 60, 60, 60, 60, 140])
   if (!soundEnabled()) return
-  hiss(0, 0.22, { type: 'highpass', from: 3500, to: 6000, gain: 0.22 })
+  void playSample(MEDIC_FILE, 1)
+  const d = MEDIC_MS / 1000 // syringe starts once "MEDIC!" is (almost) over
+  hiss(d, 0.22, { type: 'highpass', from: 3500, to: 6000, gain: 0.22 })
   const notes = [523, 659, 784, 1047, 1319]
   notes.forEach((f, i) => {
-    tone(f, 0.18 + i * 0.075, 0.35, { type: 'triangle', gain: 0.22 })
-    tone(f * 2, 0.18 + i * 0.075, 0.25, { type: 'sine', gain: 0.06 })
+    tone(f, d + 0.18 + i * 0.075, 0.35, { type: 'triangle', gain: 0.22 })
+    tone(f * 2, d + 0.18 + i * 0.075, 0.25, { type: 'sine', gain: 0.06 })
   })
-  tone(2093, 0.6, 0.6, { type: 'sine', gain: 0.08 })
+  tone(2093, d + 0.6, 0.6, { type: 'sine', gain: 0.08 })
 }
 
 /** Feuer (three aces): fire explosion recording. */

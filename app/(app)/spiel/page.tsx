@@ -19,6 +19,7 @@ import {
   feedbackFire,
   feedbackWinner,
   animationsEnabled,
+  MEDIC_MS,
   initFeedback,
 } from '@/lib/feedback'
 import { CoinRain, EFFECT_DURATION, type EffectKind, type GameEffect } from '@/components/ui/GameEffects'
@@ -94,10 +95,10 @@ export default function SpielPage() {
   function playEffect(kind: EffectKind, playerId: string, fromPlayerId?: string) {
     if (!animationsEnabled()) return
     const id = ++effectId.current
-    const holdGray = kind === 'revive'
+    const holdGray = kind === 'revive' || kind === 'medic'
     setEffects(list => [...list, { id, kind, playerId, fromPlayerId, holdGray }])
     // Revive: the avatar regains its colour once the syringe has injected.
-    if (holdGray) setTimeout(() => setEffects(list => list.map(e => (e.id === id ? { ...e, holdGray: false } : e))), 1350)
+    if (kind === 'revive') setTimeout(() => setEffects(list => list.map(e => (e.id === id ? { ...e, holdGray: false } : e))), 1350)
     setTimeout(() => setEffects(list => list.filter(e => e.id !== id)), EFFECT_DURATION[kind])
   }
 
@@ -438,8 +439,10 @@ export default function SpielPage() {
               const target = reviveTarget
               setReviveTarget(null)
               if (target) {
+                // "MEDIC!" (avatar shakes), then the syringe flies once the call is over.
                 feedbackRevive()
-                playEffect('revive', target, reviverId)
+                playEffect('medic', target)
+                setTimeout(() => playEffect('revive', target, reviverId), MEDIC_MS)
                 await revivePlayer(target, reviverId)
               }
             }}

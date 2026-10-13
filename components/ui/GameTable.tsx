@@ -287,8 +287,9 @@ export default function GameTable({
       {(!isRoundActive || layout) && sessionPlayers.map((sp, i) => {
         const pos = positions[i]
         const rp = getRoundPlayer(sp.player_id)
-        // A revive animation keeps the player grey until the syringe has injected.
-        const heldGray = playerEffectsFor(sp.player_id).some(e => e.kind === 'revive' && e.holdGray)
+        // The medic call + revive animation keep the player grey until the syringe has injected.
+        const heldGray = playerEffectsFor(sp.player_id).some(e => (e.kind === 'revive' || e.kind === 'medic') && e.holdGray)
+        const shaking = playerEffectsFor(sp.player_id).some(e => e.kind === 'medic')
         const isEliminated = isRoundActive && rp ? !rp.is_active || heldGray : false
         const isWinner = isRoundActive && rp ? rp.is_winner : false
         const balance = sessionBalances[sp.player_id] ?? 0
@@ -305,6 +306,8 @@ export default function GameTable({
             style={{ left: `${pos.left}%`, top: `${pos.top}%`, zIndex: playerEffects.length > 0 ? 40 : undefined }}
           >
             <div className="relative">
+              {/* "MEDIC!": only the portrait shakes; the speech bubble below stays steady */}
+              <div className={shaking ? 'fx-shake' : undefined}>
               <PlayerAvatar
                 name={player.name}
                 avatarUrl={player.avatar_url}
@@ -314,6 +317,7 @@ export default function GameTable({
                 birthday={player.birthday}
                 winStreak={winStreaks?.get(sp.player_id) ?? 0}
               />
+              </div>
               {dealerId === sp.player_id && (
                 <span
                   className="absolute -top-1 -left-1 bg-[#2E6B3A] text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow ring-2 ring-[#F4ECDA]"
@@ -325,7 +329,7 @@ export default function GameTable({
               )}
               {playerEffects.map(e => (
                 <div key={e.id} className="absolute inset-0 z-30 pointer-events-none">
-                  <PlayerEffect kind={e.kind} size={avatarPx} />
+                  <PlayerEffect kind={e.kind} size={avatarPx} align={pos.left > 68 ? 'right' : pos.left < 32 ? 'left' : 'center'} />
                 </div>
               ))}
             </div>
