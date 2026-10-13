@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
@@ -72,6 +72,9 @@ export default function SpielPage() {
   } = useSession()
 
   const [activeSeason, setActiveSeason] = useState<Season | null>(null)
+  // Season + players load separately from the session: until both are in, show
+  // "Laden…" instead of an empty picker / a false "Keine aktive Season".
+  const [metaLoaded, setMetaLoaded] = useState(false)
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
   const [defaultStake, setDefaultStake] = useState(3)
   const [selectedMultiplier, setSelectedMultiplier] = useState(1)
@@ -173,21 +176,25 @@ export default function SpielPage() {
   }, [completedRound])
 
   async function loadMeta() {
-    const [{ data: seasons }, all] = await Promise.all([
-      supabase.from('seasons').select('*').eq('status', 'active').limit(1),
-      loadPlayers(supabase), // shared cache: avatars are loaded once, not per screen
-    ])
-    setActiveSeason(seasons?.[0] ?? null)
+    try {
+      const [{ data: seasons }, all] = await Promise.all([
+        supabase.from('seasons').select('*').eq('status', 'active').limit(1),
+        loadPlayers(supabase).catch(() => []), // shared cache: avatars are loaded once, not per screen
+      ])
+      setActiveSeason(seasons?.[0] ?? null)
 
-    const players = all.filter(p => p.is_active)
-    setAllPlayers(players)
+      const players = all.filter(p => p.is_active)
+      setAllPlayers(players)
 
-    // Default selection: Domi, Tom, André (if they exist)
-    const defaults = players.filter(p => DEFAULT_PLAYERS.includes(p.name)).map(p => p.id)
-    setPickedIds(new Set(defaults))
+      // Default selection: Domi, Tom, André (if they exist)
+      const defaults = players.filter(p => DEFAULT_PLAYERS.includes(p.name)).map(p => p.id)
+      setPickedIds(new Set(defaults))
 
-    const saved = localStorage.getItem('schnauz_default_stake')
-    if (saved) setDefaultStake(parseInt(saved))
+      const saved = localStorage.getItem('schnauz_default_stake')
+      if (saved) setDefaultStake(parseInt(saved))
+    } finally {
+      setMetaLoaded(true) // never get stuck on "Laden…", even if a request failed
+    }
   }
 
   // Season-wide balance (carry-over + all sessions of the active season)
@@ -323,7 +330,7 @@ export default function SpielPage() {
     marginBottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom) - 6rem)`,
   }
 
-  if (loading) {
+  if (loading || !metaLoaded) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60vh]">
         <div className="text-[#7C7461]">Laden...</div>
@@ -656,7 +663,8 @@ function PlayerPickGrid({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 0, h: 0 })
-  useEffect(() => {
+  // Layout effect: measure before the first paint, so the tiles never flash in empty.
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const r = el.getBoundingClientRect()

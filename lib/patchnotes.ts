@@ -49,6 +49,7 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'verbessert', text: 'Hot Streak ☄️ zeigt die Länge der Siegesserie (z. B. „4 am Stück“) und wird auch bei kurzen Serien vergeben.' },
       { type: 'verbessert', text: 'Profilbild frei verschieben und mit zwei Fingern zoomen.' },
       { type: 'verbessert', text: 'Größere Pfeile für die Sitzordnung, neueste Season steht oben.' },
+      { type: 'behoben', text: 'Beim Öffnen der App ohne laufende Session erschien kurz eine leere Spielerauswahl mit dem Hinweis „Keine aktive Season“ – jetzt steht dort „Laden…“, bis Season und Spieler da sind.' },
       { type: 'behoben', text: 'Der Sound blieb meist stumm, besonders beim Rundensieg – jetzt zuverlässig und lauter.' },
       { type: 'behoben', text: 'Der Geber zeigte nicht zuverlässig auf den Verlierer der Vorrunde – z. B. nach einer Wiederbelebung oder „Rückgängig“.' },
       { type: 'behoben', text: 'Bei vielen Achievements wurde der Spielername in der Statistik verdrängt.' },
