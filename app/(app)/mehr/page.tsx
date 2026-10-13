@@ -37,7 +37,8 @@ export default function MehrPage() {
       <p className="text-center text-[#B0A084] text-[10px] leading-relaxed mt-3 px-4 pb-4">
         Sounds: Feuer „fire explosion“ von readeonly; Furzgeräusche von crimsonblaze, aetherzip, teddyferguson,
         zott820, delphidebrain, bassimat, timtube, frenkfurth, under7dude u. a. – alle via freesound.org.
-        Siegessound: 50 Cent – „I Get Money“.
+        Siegessongs (Ausschnitte): Body Head Bangerz, Jay Rock, Kendrick Lamar, Haftbefehl, Drake, Fat Joe, JAY-Z,
+        Wu-Tang Clan, K.I.Z, Rick Ross und 50 Cent. Season-Rückblick: 50 Cent – „I Get Money“.
       </p>
     </div>
   )

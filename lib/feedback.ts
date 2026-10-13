@@ -211,8 +211,20 @@ const FART_FILES = [
 ]
 /** Fire explosion (freesound #186932 by readeonly), trimmed to start at 1.1 s. */
 const FIRE_FILE = '/sounds/fire.wav'
-/** Round won: 50 Cent – "I Get Money" (trimmed clip). */
-const WIN_FILE = '/sounds/win.mp3'
+/** Round won: one of these clips at random (cut by the user, fade-outs included). */
+const WIN_FILES = [
+  '/sounds/win/cant-be-touched.mp3', // Body Head Bangerz – Can't Be Touched
+  '/sounds/win/win-jay-rock.mp3', // Jay Rock – WIN
+  '/sounds/win/money-trees.mp3', // Kendrick Lamar – Money Trees
+  '/sounds/win/cwwdbi.mp3', // Haftbefehl – CWWDBI
+  '/sounds/win/started-from-the-bottom.mp3', // Drake – Started From the Bottom
+  '/sounds/win/make-it-rain.mp3', // Fat Joe – Make It Rain
+  '/sounds/win/big-pimpin.mp3', // JAY-Z – Big Pimpin'
+  '/sounds/win/cream.mp3', // Wu-Tang Clan – C.R.E.A.M.
+  '/sounds/win/geld-essen.mp3', // K.I.Z – Geld essen
+  '/sounds/win/hustlin.mp3', // Rick Ross – Hustlin'
+  '/sounds/win/i-get-money.mp3', // 50 Cent – I Get Money
+]
 
 const sampleCache = new Map<string, Promise<AudioBuffer | null>>()
 let sampleOut: GainNode | null = null
@@ -241,7 +253,9 @@ function loadSample(url: string): Promise<AudioBuffer | null> {
 function preloadSounds() {
   if (preloaded) return
   preloaded = true
-  for (const url of [...FART_FILES, FIRE_FILE, WIN_FILE]) void loadSample(url)
+  for (const url of [...FART_FILES, FIRE_FILE]) void loadSample(url)
+  // Win songs are bigger: only the one that plays next is fetched and decoded ahead.
+  pickNextWin()
 }
 
 /**
@@ -573,7 +587,18 @@ function clink(start: number, freq: number, gain: number, pan: number) {
   n.stop(t0 + 0.02)
 }
 
-/** Round won: 50 Cent – "I Get Money". */
+let lastWin = -1
+let nextWin = -1
+
+/** Chooses (and preloads) the song for the next win — never the one that just played. */
+function pickNextWin() {
+  let i = Math.floor(Math.random() * WIN_FILES.length)
+  if (i === lastWin) i = (i + 1 + Math.floor(Math.random() * (WIN_FILES.length - 1))) % WIN_FILES.length
+  nextWin = i
+  void loadSample(WIN_FILES[i])
+}
+
+/** Round won: a random victory song. */
 export function feedbackWinner() {
   vib([70, 50, 70, 50, 70, 50, 70, 50, 320])
   if (!soundEnabled()) return
@@ -584,10 +609,15 @@ export function feedbackWinner() {
     /* already stopped */
   }
   winSource = null
-  void playSample(WIN_FILE, 0.85).then(src => {
+  if (nextWin < 0) pickNextWin()
+  const url = WIN_FILES[nextWin]
+  lastWin = nextWin
+  void playSample(url, 0.85).then(src => {
     if (src) winSource = src
     else synthCoins()
+    sampleCache.delete(url) // the playing source keeps its buffer; don't hoard decoded songs
   })
+  pickNextWin()
 }
 
 /** Fallback when the recording can't be loaded: a shower of clinking, bouncing coins. */
