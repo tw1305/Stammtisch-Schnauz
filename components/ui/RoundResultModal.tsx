@@ -41,6 +41,9 @@ type Phase = 'award' | 'fly' | 'done'
 const AWARD_MS = 2000
 const FLY_MS = 750
 const AVATAR = 128
+/** Smaller portrait + tighter header on short screens, so standings and buttons always fit. */
+const AVATAR_SHORT = 104
+const SHORT_SCREEN = 740
 /** "Aus dem Jenseits": a burst during the award, a smaller one once the portrait has landed. */
 const GHOST_WAVES: GhostWave[] = [
   { delay: 0.6, count: 7 },
@@ -76,6 +79,8 @@ export default function RoundResultModal({
   const otherMs = milestones.filter(m => m.playerId !== winnerId).flatMap(m => m.items.map(item => ({ item, name: m.name })))
 
   const [animated] = useState(() => animationsEnabled())
+  const [short] = useState(() => typeof window !== 'undefined' && window.innerHeight < SHORT_SCREEN)
+  const avatarSize = short ? AVATAR_SHORT : AVATAR
   const [phase, setPhase] = useState<Phase>(animated ? 'award' : 'done')
   const [offset, setOffset] = useState<{ x: number; y: number; s: number } | null>(null)
   const avatarRef = useRef<HTMLDivElement>(null)
@@ -131,6 +136,7 @@ export default function RoundResultModal({
         ? { opacity: 0 } // until measured (same frame, before paint)
         : { transform: 'none', transition: `transform ${FLY_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1)` }
 
+  const compact = players.length > 5
   const standings = [...players].sort(
     (a, b) => (sessionBalances[b.player_id] ?? 0) - (sessionBalances[a.player_id] ?? 0)
   )
@@ -146,7 +152,7 @@ export default function RoundResultModal({
           ref={captionRef}
           className={`fixed left-0 right-0 text-center pointer-events-none z-[2] transition-opacity duration-300 ${award ? 'opacity-100' : 'opacity-0'}`}
           style={{
-            top: window.innerHeight * 0.42 + (AVATAR * offset.s) / 2 + 22 + (firstBlood ? AVATAR * offset.s * 0.12 : 0),
+            top: window.innerHeight * 0.42 + (avatarSize * offset.s) / 2 + 22 + (firstBlood ? avatarSize * offset.s * 0.12 : 0),
             // Flashes behind the caption: a dark halo keeps the white text readable.
             textShadow: stormLevel ? '0 2px 10px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9)' : undefined,
           }}
@@ -171,7 +177,7 @@ export default function RoundResultModal({
         }`}
       >
         {/* Header with the winner's portrait */}
-        <div className="relative px-5 pt-12 pb-6 text-center shrink-0">
+        <div className={`relative px-5 text-center shrink-0 ${short ? 'pt-8 pb-4' : 'pt-12 pb-6'}`}>
           <div
             className={`absolute inset-0 rounded-t-3xl ${fade}`}
             style={{ background: 'linear-gradient(160deg, rgba(212,175,55,0.28), rgba(255,253,247,0.6))' }}
@@ -180,12 +186,12 @@ export default function RoundResultModal({
             <div className={`relative ${animated ? 'award-pop' : ''}`}>
               {/* Behind the portrait (and its ring/flames): ghosts escaping past the rim */}
               {/* First Blood: blood pooling out from behind the portrait (stays after landing) */}
-              {firstBlood && animated && <BloodSplash size={AVATAR} />}
-              {comeback && animated && <GhostBurst size={AVATAR} waves={GHOST_WAVES} />}
+              {firstBlood && animated && <BloodSplash size={avatarSize} />}
+              {comeback && animated && <GhostBurst size={avatarSize} waves={GHOST_WAVES} />}
               <PlayerAvatar
                 name={winnerName}
                 avatarUrl={winner?.player?.avatar_url}
-                size={AVATAR}
+                size={avatarSize}
                 birthday={winner?.player?.birthday}
                 winStreak={winnerStreak}
                 ringAppear={animated}
@@ -194,7 +200,7 @@ export default function RoundResultModal({
             </div>
           </div>
           <div className={`relative ${fade}`}>
-            <h2 className={`font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] ${firstBlood && animated ? 'mt-9' : 'mt-4'}`}>
+            <h2 className={`font-[family-name:var(--font-display)] text-3xl font-bold text-[#23201A] ${firstBlood && animated ? 'mt-9' : short ? 'mt-3' : 'mt-4'}`}>
               🏆 {winnerName} gewinnt!
             </h2>
             <p className="text-[#1F9D57] font-bold text-lg mt-1">{formatBalance(winnerGain)} in dieser Runde</p>
@@ -202,7 +208,15 @@ export default function RoundResultModal({
             {comeback && <p className="text-[#4B5D86] font-semibold text-sm mt-1">👻 Aus dem Jenseits!</p>}
             {streakLine && <p className="text-[#9A6A0C] font-semibold text-sm mt-1">{streakLine}</p>}
             {(winnerMs.length > 0 || otherMs.length > 0) && (
-              <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 text-sm">
+              // One swipeable line, however many there are: the standings below keep their room.
+              <div
+                className="-mx-5 mt-2.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{
+                  WebkitMaskImage: 'linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent)',
+                  maskImage: 'linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent)',
+                }}
+              >
+              <div className="mx-auto flex w-max gap-1.5 whitespace-nowrap px-5 py-0.5 text-sm">
                 {winnerMs.map(m => (
                   <MilestoneBanner key={m.kind + m.value} icon={m.icon} text={milestoneText(m, m.kind === 'balance' ? winnerName : undefined)} />
                 ))}
@@ -216,20 +230,21 @@ export default function RoundResultModal({
                   </span>
                 ))}
               </div>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Season standings */}
-        <div className={`px-5 py-4 border-t border-[#E4D9BF] overflow-y-auto min-h-0 flex-1 ${fade}`}>
-          <p className="text-[#7C7461] text-xs uppercase tracking-wider mb-3 font-medium">Saison-Stand</p>
-          <div className="space-y-2.5">
+        {/* Season standings: every player and balance always visible (two compact columns from 6 players) */}
+        <div className={`px-5 border-t border-[#E4D9BF] overflow-y-auto min-h-0 shrink-0 ${compact ? 'py-3' : 'py-4'} ${fade}`}>
+          <p className={`text-[#7C7461] text-xs uppercase tracking-wider font-medium ${compact ? 'mb-2' : 'mb-3'}`}>Saison-Stand</p>
+          <div className={compact ? 'grid grid-cols-2 gap-x-4 gap-y-1.5' : 'space-y-2.5'}>
             {standings.map(rp => {
               const bal = sessionBalances[rp.player_id] ?? 0
               return (
-                <div key={rp.player_id} className="flex items-center gap-3">
-                  <PlayerAvatar name={rp.player?.name ?? ''} avatarUrl={rp.player?.avatar_url} size={32} />
-                  <span className="text-[#23201A] flex-1 truncate">
+                <div key={rp.player_id} className={`flex items-center min-w-0 ${compact ? 'gap-2 text-sm' : 'gap-3'}`}>
+                  <PlayerAvatar name={rp.player?.name ?? ''} avatarUrl={rp.player?.avatar_url} size={compact ? 24 : 32} />
+                  <span className="text-[#23201A] flex-1 min-w-0 truncate">
                     {rp.player?.name ?? ''}
                     {rp.player_id === winnerId && ' 👑'}
                   </span>

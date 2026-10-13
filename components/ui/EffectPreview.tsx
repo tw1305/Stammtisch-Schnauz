@@ -12,14 +12,20 @@ import type { Player, RoundPlayer } from '@/types/database'
 
 type Preview = { stake: number; firstBlood: boolean; milestones: boolean; key: number }
 
-/** Example milestones for the preview: winner 100. Sieg + 5 in a row, others a round and a shame jubilee. */
+/**
+ * Example milestones for the preview (worst case for the layout: lots of them):
+ * winner 100. Sieg + 5 in a row + 100 €, everyone else a round / fire / shame jubilee.
+ */
 function demoMilestones(players: Player[]): PlayerMilestones[] {
   const t = EMPTY_TOTALS
-  const [w, a, b] = players
+  const [w, ...rest] = players
   const out: PlayerMilestones[] = []
-  if (w) out.push({ playerId: w.id, name: w.name, items: findMilestones({ ...t, wins: 99, streak: 4 }, { ...t, wins: 100, streak: 5 }) })
-  if (a) out.push({ playerId: a.id, name: a.name, items: findMilestones({ ...t, rounds: 99 }, { ...t, rounds: 100 }) })
-  if (b) out.push({ playerId: b.id, name: b.name, items: findMilestones({ ...t, firstOuts: 49, balance: -95 }, { ...t, firstOuts: 50, balance: -101 }) })
+  if (w) out.push({ playerId: w.id, name: w.name, items: findMilestones({ ...t, wins: 99, streak: 4, balance: 90 }, { ...t, wins: 100, streak: 5, balance: 110 }) })
+  rest.forEach((p, i) => {
+    const before = [{ ...t, rounds: 99 }, { ...t, firstOuts: 49, balance: -95 }, { ...t, fires: 0 }][i % 3]
+    const after = [{ ...t, rounds: 100 }, { ...t, firstOuts: 50, balance: -101 }, { ...t, fires: 1 }][i % 3]
+    out.push({ playerId: p.id, name: p.name, items: findMilestones(before, after) })
+  })
   return out
 }
 
@@ -41,7 +47,7 @@ export default function EffectPreview() {
       .select('*')
       .eq('is_active', true)
       .order('name')
-      .limit(4)
+      .limit(9)
       .then(({ data }) => setPlayers((data || []) as Player[]))
     initFeedback()
   }, [])
@@ -139,6 +145,7 @@ export default function EffectPreview() {
           onNewRound={() => setPreview(null)}
           onManagePlayers={() => setPreview(null)}
           onEndSession={() => setPreview(null)}
+          onUndo={() => setPreview(null)}
           firstBlood={preview.firstBlood}
           storm={stormFor(preview.stake)}
           milestones={preview.milestones ? demoMilestones(players) : []}
