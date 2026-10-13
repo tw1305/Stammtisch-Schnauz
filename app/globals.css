@@ -236,12 +236,14 @@ body {
   50% { transform: translate(2px, -2px); }
 }
 .rc-bob { animation: rc-bob 3.2s ease-in-out infinite; }
+/* drops fall ~0.45× the portrait deep into the picture (units of the 100-wide cloud) */
 @keyframes rc-drop {
   0% { transform: translateY(0); opacity: 0; }
-  15% { opacity: 1; }
-  100% { transform: translateY(26px); opacity: 0; }
+  12% { opacity: 1; }
+  80% { opacity: 0.95; }
+  100% { transform: translateY(62px); opacity: 0; }
 }
-.rc-drop { opacity: 0; animation: rc-drop 1.1s linear infinite; }
+.rc-drop { opacity: 0; animation: rc-drop 1.3s cubic-bezier(0.45, 0, 1, 1) infinite; }
 
 /* Milestone ribbon: a shine sweeps across */
 @keyframes ms-shine {

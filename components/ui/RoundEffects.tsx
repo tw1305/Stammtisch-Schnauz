@@ -593,27 +593,30 @@ export function Bandage({ size, faded = false }: { size: number; faded?: boolean
 // =====================================================================
 
 /**
- * Little grey cloud raining over the portrait. `raised` lifts it above a Noob
- * sign standing on the same portrait. Render inside the avatar's `relative` box.
+ * Little grey cloud sitting right on the portrait's upper rim, raining down into
+ * the picture. `raised` lifts it onto a Noob sign standing on the same portrait.
+ * Render inside the avatar's `relative` box.
  */
 export function RainCloud({ size, raised = false }: { size: number; raised?: boolean }) {
   const W = Math.max(30, size * 0.78)
-  const lift = raised ? size * 0.5 : -size * 0.04
+  // The box holds just the cloud (its lower edge dips into the picture / onto the
+  // sign); the drops overflow below it and fall into the portrait.
+  const lift = raised ? size * 0.36 : -size * 0.14
   return (
     <div
       className="absolute left-1/2 pointer-events-none z-[21]"
-      style={{ width: W, height: W * 0.85, marginLeft: -W / 2, bottom: `calc(100% + ${lift}px)` }}
+      style={{ width: W, height: W * 0.42, marginLeft: -W / 2, bottom: `calc(100% + ${lift}px)` }}
       aria-label="Pechsträhne"
       role="img"
     >
-      <svg viewBox="0 0 100 85" className="w-full h-full overflow-visible">
+      <svg viewBox="0 8 100 42" className="w-full h-full overflow-visible">
         <g className="rc-bob">
           {/* drops first, so they fall out from behind the cloud */}
           {[24, 40, 56, 72].map((x, i) => (
             <path
               key={x}
               className="rc-drop"
-              d={`M${x},46 q-2,7 0,9 q2,-2 0,-9 Z`}
+              d={`M${x},40 q-3.5,10 0,13 q3.5,-3 0,-13 Z`}
               fill="#6FA8E8"
               stroke="#3F78B8"
               strokeWidth="0.8"
