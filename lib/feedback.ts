@@ -246,6 +246,28 @@ const WIN_FILES = [
 const FIRST_BLOOD_FILE = '/sounds/first-blood.mp3'
 /** If the call isn't decoded by then, the song starts without it. */
 const FIRST_BLOOD_WAIT_MS = 1500
+/**
+ * The song takes over once the call has faded below this level (RMS, dBFS) for
+ * good — its quiet tail and the song's start overlap slightly instead of leaving
+ * a gap (the clip itself is loud until ~1.7 s, fades out and ends in silence at 2.9 s).
+ */
+const FIRST_BLOOD_HANDOVER_DB = -24
+
+/** Time (s) after which `buf` stays below `thresholdDb` RMS, measured in 50 ms windows over all channels. */
+function fadeOutPoint(buf: AudioBuffer, thresholdDb: number): number {
+  const win = Math.max(1, Math.round(buf.sampleRate * 0.05))
+  const limit = Math.pow(10, thresholdDb / 10) // mean square
+  for (let end = buf.length; end > 0; end -= win) {
+    const start = Math.max(0, end - win)
+    let sum = 0
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c)
+      for (let i = start; i < end; i++) sum += d[i] * d[i]
+    }
+    if (sum / ((end - start) * buf.numberOfChannels) >= limit) return end / buf.sampleRate
+  }
+  return buf.duration
+}
 
 const sampleCache = new Map<string, Promise<AudioBuffer | null>>()
 let sampleOut: GainNode | null = null
@@ -671,8 +693,9 @@ function pickNextWin() {
 }
 
 /**
- * Plays the First Blood call now. Resolves to the AudioContext time at which it
- * ends, or null if it couldn't be loaded in time (then the song just starts).
+ * Plays the First Blood call now. Resolves to the AudioContext time at which the
+ * song should take over (as the call fades out), or null if it couldn't be
+ * loaded in time (then the song just starts).
  */
 async function playFirstBlood(): Promise<number | null> {
   const a = audio()
@@ -685,7 +708,7 @@ async function playFirstBlood(): Promise<number | null> {
   const src = await playSample(FIRST_BLOOD_FILE, 1)
   if (!src) return null
   introSource = src
-  return a.ctx.currentTime + buf.duration
+  return a.ctx.currentTime + fadeOutPoint(buf, FIRST_BLOOD_HANDOVER_DB)
 }
 
 function stopSource(src: AudioBufferSourceNode | null) {
