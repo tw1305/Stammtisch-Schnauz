@@ -19,6 +19,7 @@ import {
   feedbackRevive,
   feedbackFire,
   feedbackWinner,
+  feedbackRoundStart,
 } from '@/lib/feedback'
 import EffectPreview from '@/components/ui/EffectPreview'
 
@@ -28,6 +29,7 @@ const SOUND_TESTS = [
   { label: '🔥 Feuer', play: feedbackFire },
   { label: '🪙 Sieg', play: () => feedbackWinner() },
   { label: '🩸 First Blood', play: () => feedbackWinner({ firstBlood: true }) },
+  { label: '🃏 Rundenstart', play: () => feedbackRoundStart(3, 70, 760) },
 ]
 
 const STAKE_KEY = 'schnauz_default_stake'

@@ -7,7 +7,7 @@ import { useSession } from '@/hooks/useSession'
 import { useSessionMarks } from '@/hooks/useSessionMarks'
 import { applyRound, findMilestones, EMPTY_TOTALS, type PlayerMilestones } from '@/lib/milestones'
 import { stormFor } from '@/lib/effects'
-import GameTable from '@/components/ui/GameTable'
+import GameTable, { measureTokens, type TokenSpots } from '@/components/ui/GameTable'
 import { NAV_HEIGHT } from '@/components/ui/BottomNav'
 import { TEST_BANNER_HEIGHT, useTestMode } from '@/components/ui/TestModeBanner'
 import RoundResultModal from '@/components/ui/RoundResultModal'
@@ -111,6 +111,8 @@ export default function SpielPage() {
   const [coinRain, setCoinRain] = useState(false)
   const effectId = useRef(0)
   const balanceRequest = useRef(0)
+  const setupTableRef = useRef<HTMLDivElement>(null)
+  const [flyFrom, setFlyFrom] = useState<TokenSpots | null>(null)
   const testMode = useTestMode()
   // Noob signs: change (drop in / topple away) only when a round starts.
   // Noob signs (change when a round starts) and rain clouds (losing streak, right after each round).
@@ -277,6 +279,8 @@ export default function SpielPage() {
 
   async function handleStartRound() {
     if (sessionPlayers.length < 2) return
+    // Remember where the tokens sit now: they fly from here to their seats at the table.
+    setFlyFrom(measureTokens(setupTableRef.current))
     await startRound(effectiveStake)
   }
 
@@ -459,6 +463,7 @@ export default function SpielPage() {
 
         <div className="flex-1 min-h-0 px-2">
           <GameTable
+            key="round" // own instance: never inherits the setup table's size
             sessionPlayers={sessionPlayers}
             roundPlayers={roundPlayers}
             sessionBalances={sessionBalances}
@@ -469,6 +474,8 @@ export default function SpielPage() {
             effects={effects}
             noobSigns={noobSigns}
             rainClouds={rainClouds}
+            flyFrom={flyFrom}
+            onFlyDone={() => setFlyFrom(null)}
           />
         </div>
 
@@ -544,8 +551,9 @@ export default function SpielPage() {
       </div>
 
       {/* Table — takes whatever height is left and shrinks to fit */}
-      <div className="flex-1 min-h-[180px] px-4 py-3">
+      <div ref={setupTableRef} className="flex-1 min-h-[180px] px-4 py-3">
         <GameTable
+          key="setup"
           sessionPlayers={sessionPlayers}
           sessionBalances={sessionBalances}
           isRoundActive={false}

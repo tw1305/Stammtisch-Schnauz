@@ -80,7 +80,7 @@ function label(kind: MilestoneKind, n: number): string {
     case 'firstOuts':
       return `${n}. Mal Erster raus`
     case 'balance':
-      return n > 0 ? `knackt +${n} € in der Season` : `rutscht unter −${Math.abs(n)} € in der Season`
+      return n > 0 ? `knackt +${n} €` : `rutscht unter −${Math.abs(n)} €`
   }
 }
 
@@ -134,7 +134,7 @@ export function applyRound(t: PlayerTotals, r: RoundContribution): PlayerTotals 
 /** One player's milestones of a round (for the result screen). */
 export type PlayerMilestones = { playerId: string; name: string; items: Milestone[] }
 
-/** Text with the player's name: "Domi: 100. Runde", "Tom knackt +100 € in der Season". */
+/** Text with the player's name: "Domi: 100. Runde", "Tom knackt +100 €". */
 export function milestoneText(m: Milestone, name?: string): string {
   if (m.kind === 'balance') return name ? `${name} ${m.label}` : m.label.replace(/^\w/, c => c.toUpperCase())
   return name ? `${name}: ${m.label}` : m.label

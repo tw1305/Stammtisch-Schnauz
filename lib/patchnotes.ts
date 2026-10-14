@@ -18,7 +18,7 @@ export type PatchNote = {
 export const PATCH_NOTES: PatchNote[] = [
   {
     version: '2.0.0',
-    date: '2026-10-13',
+    date: '2026-10-14',
     title: 'Feuer und Flamme (Season 4 Update)',
     changes: [
       { type: 'neu', text: 'Season-Rückblick ✨: Zum Abschluss einer Season erscheint eine Story mit den Highlights – Podium, rote Laterne, bester und härtester Abend, Achterbahn (der tiefe Fall vom höchsten Plus ins Minus und das größte Comeback aus dem Minus, mit eingezeichnetem Saldo-Verlauf), Hot Streak, Feuer-König, Erster raus, das Finale (Dauergast im Finale und Finalkönig), Notaufnahme, teuerste Runde und Stammgäste – bildschirmfüllend auf jedem Handy. Unter „Und jetzt du“ wählt jeder sich selbst aus und sieht seine Season samt Erzfeind (gegen wen man die meisten Finals verloren hat) und Lieblingsgegner (gegen wen man die meisten Finals gewonnen hat). Dazu läuft „I Get Money“ von 50 Cent in voller Länge. Oben rechts lässt sich die Story pausieren und die Musik stummschalten. Zum Schluss der Endstand zum Teilen. Jederzeit nochmal über die Season-Übersicht abrufbar (ab Season 3).' },
@@ -27,6 +27,7 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'neu', text: 'Rundenende: Der Sieger erscheint groß in der Bildschirmmitte, bekommt Ring oder Flamme per Animation und fliegt dann in die (jetzt größere) Rundenübersicht.' },
       { type: 'neu', text: 'First Blood 🩸: Wer die erste Runde einer Session gewinnt, bekommt im Siegerbildschirm eine Blutlache, die hinter dem Profilbild hervorquillt und langsam heruntertropft – und vor dem Siegessong ertönt der „First Blood“-Ruf aus Counter-Strike.' },
       { type: 'neu', text: 'Unwetter ⚡: Beim Rundensieg blitzt es im Siegerbildschirm – mit jeder Einsatzstufe heftiger: ein Blitz bei 3 €, zwei bei 6 €, drei bei 9 €, ab 12 € dunkler Himmel, Sturmwolken und flackernde Blitze, bei 15 € Regen und Blitz auf Blitz, ab 18 € ein ausgewachsenes Gewitter mit Platzregen und wackelndem Bildschirm.' },
+      { type: 'neu', text: 'Rundenstart 🃏: Beim Start einer Runde fliegen alle Spieler samt Saldo vom Vorbereitungstisch an ihre Plätze am Holztisch – mit Whoosh, Holz-Klopfen beim Landen und Kartenmischen.' },
       { type: 'neu', text: 'Finale-Duell ⚔️: Sind nur noch zwei Spieler übrig, dunkelt der Tisch ab, Spotlights fallen auf die beiden Finalisten, ein Blitz knistert zwischen ihnen und ein „VS“ erscheint.' },
       { type: 'neu', text: 'Pflaster 🩹 und Regenwolke 🌧️: Wer wiederbelebt wurde, trägt für den Rest der Runde gekreuzte Pflaster am Profilbild. Wer in einer Session vier Runden in Folge nicht gewinnt, bekommt eine kleine Regenwolke über den Kopf – bis zum nächsten Sieg.' },
       { type: 'neu', text: 'Meilensteine 🏅 im Siegerbildschirm, mit goldenem Band und Konfetti, als wischbare Leiste – der Saison-Stand bleibt immer komplett sichtbar (ab 6 Spielern zweispaltig): Siege (10, 25, 50, 75, 100, dann alle 50), Siegesserien (5, 7, 10 am Stück), gespielte Runden (50, 100, 200, 300, 500, dann alle 250), Feuer (das erste, 5, 10, 25, 50), Wiederbelebt worden und Andere belebt (10, 25, 50), Erster raus (10, 25, 50, 100) sowie Season-Saldo über +50/+100/+200 € oder unter −50/−100/−200 €.' },

@@ -1,12 +1,29 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { formatBalance, getBalanceColor } from '@/lib/game-logic'
 import PlayerAvatar from './PlayerAvatar'
 import { PlayerEffect, SyringeFlight, type GameEffect } from './GameEffects'
 import { NoobSign, Bandage, RainCloud, FinalDuel, type NoobSignState } from './RoundEffects'
-import { animationsEnabled } from '@/lib/feedback'
+import { animationsEnabled, reducedMotion, feedbackRoundStart } from '@/lib/feedback'
 import type { SessionPlayer, RoundPlayer } from '@/types/database'
+
+/** Where each player's token sat on screen before the round started (centre + width, px). */
+export type TokenSpots = { at: number; spots: Map<string, { x: number; y: number; w: number }> }
+
+/** Reads the token positions of a (setup) table, for the round-start flight. */
+export function measureTokens(root: HTMLElement | null): TokenSpots {
+  const spots = new Map<string, { x: number; y: number; w: number }>()
+  root?.querySelectorAll<HTMLElement>('[data-player]').forEach(el => {
+    const r = el.getBoundingClientRect()
+    spots.set(el.dataset.player!, { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width })
+  })
+  return { at: Date.now(), spots }
+}
+
+/** Round-start flight: per-token stagger and flight time (ms). */
+const FLY_STAGGER = 70
+const FLY_MS = 760
 
 type GameTableProps = {
   sessionPlayers: SessionPlayer[]
@@ -23,6 +40,9 @@ type GameTableProps = {
   noobSigns?: Map<string, NoobSignState>
   /** Rain clouds above portraits (losing streak in the session). */
   rainClouds?: Set<string>
+  /** Round just started: tokens fly in from these spots (measured on the setup table). */
+  flyFrom?: TokenSpots | null
+  onFlyDone?: () => void
 }
 
 type Sizing = { avatar: number; name: string; bal: string; radius: number }
@@ -151,10 +171,13 @@ export default function GameTable({
   effects = [],
   noobSigns,
   rainClouds,
+  flyFrom = null,
+  onFlyDone,
 }: GameTableProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ w: 0, h: 0 })
-  useEffect(() => {
+  // Layout effect: the size is known before the first paint (no frame with stale seats).
+  useLayoutEffect(() => {
     const el = boxRef.current
     if (!el) return
     // Measure right away (ResizeObserver callbacks can be delayed, e.g. in background tabs).
@@ -215,6 +238,63 @@ export default function GameTable({
   const tokenScale = layout?.scale ?? (side > 0 ? Math.min(1.1, Math.max(0.5, side / REF_WIDTH)) : 1)
   const avatarPx = Math.round(avatar * tokenScale)
 
+  // Round start: every token flies from its spot on the setup table up to its seat
+  // at the wooden table (FLIP: measured before the first paint, then animated back
+  // to its place), the scene fades in underneath. Runs once per start.
+  const tokenEls = useRef(new Map<string, HTMLElement>())
+  const sceneEl = useRef<HTMLDivElement>(null)
+  const flown = useRef<TokenSpots | null>(null)
+  const doneRef = useRef(onFlyDone)
+  useEffect(() => {
+    doneRef.current = onFlyDone
+  }, [onFlyDone])
+  const ready = !!layout
+  useLayoutEffect(() => {
+    if (!isRoundActive || !ready || !flyFrom || flown.current === flyFrom) return
+    flown.current = flyFrom
+    // Stale (the round was started elsewhere / long ago) or no animations: just show the table.
+    if (Date.now() - flyFrom.at > 8000 || !animationsEnabled() || reducedMotion()) {
+      doneRef.current?.()
+      return
+    }
+    const anims: Animation[] = []
+    let i = 0
+    for (const sp of sessionPlayers) {
+      const el = tokenEls.current.get(sp.player_id)
+      const from = flyFrom.spots.get(sp.player_id)
+      if (!el || !from) continue
+      const r = el.getBoundingClientRect()
+      const dx = from.x - (r.left + r.width / 2)
+      const dy = from.y - (r.top + r.height / 2)
+      const s = from.w / r.width
+      // `transform` composes with Tailwind's translate/scale properties used for centring.
+      anims.push(
+        el.animate(
+          [
+            { transform: `translate(${dx}px, ${dy}px) scale(${s})` },
+            { transform: `translate(${dx * 0.42}px, ${dy * 0.42 - 46}px) scale(${((s + 1) / 2) * 1.12})`, offset: 0.55 },
+            { transform: 'translate(0, 0) scale(1.06)', offset: 0.86 },
+            { transform: 'none' },
+          ],
+          { duration: FLY_MS, delay: i * FLY_STAGGER, easing: 'cubic-bezier(0.35, 0.7, 0.3, 1)', fill: 'backwards' }
+        )
+      )
+      i++
+    }
+    if (sceneEl.current) {
+      anims.push(
+        sceneEl.current.animate(
+          [{ opacity: 0, transform: 'scale(1.04)' }, { opacity: 1, transform: 'none' }],
+          { duration: 520, easing: 'ease-out', fill: 'backwards' }
+        )
+      )
+    }
+    feedbackRoundStart(i, FLY_STAGGER, FLY_MS)
+    Promise.all(anims.map(a => a.finished))
+      .catch(() => {})
+      .finally(() => doneRef.current?.())
+  }, [isRoundActive, ready, flyFrom, sessionPlayers])
+
   function playerEffectsFor(playerId: string) {
     return effects.filter(e => e.playerId === playerId)
   }
@@ -254,7 +334,7 @@ export default function GameTable({
       {/* Center — the illustrated table appears only while a round is being played, so
           the setup screen is clearly distinguishable from an active round. */}
       {isRoundActive ? (
-        <div className="absolute inset-0 rounded-3xl overflow-hidden border border-[#E4D9BF] shadow-sm bg-[#5E7A3A]">
+        <div ref={sceneEl} className="absolute inset-0 rounded-3xl overflow-hidden border border-[#E4D9BF] shadow-sm bg-[#5E7A3A]">
           {/* Blurred copy fills any space the scene doesn't cover, so the forest seems to continue. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -330,6 +410,11 @@ export default function GameTable({
         return (
           <button
             key={sp.player_id}
+            data-player={sp.player_id}
+            ref={el => {
+              if (el) tokenEls.current.set(sp.player_id, el)
+              else tokenEls.current.delete(sp.player_id)
+            }}
             onClick={() => onPlayerTap?.(sp.player_id)}
             disabled={!onPlayerTap}
             className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-1/2 active:scale-95 transition-transform"
