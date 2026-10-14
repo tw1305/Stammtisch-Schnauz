@@ -24,6 +24,11 @@ export function measureTokens(root: HTMLElement | null): TokenSpots {
 /** Round-start flight: per-token stagger and flight time (ms). */
 const FLY_STAGGER = 70
 const FLY_MS = 760
+/**
+ * Share of FLY_MS at which a token touches its seat: the 0.86 keyframe under the
+ * flight easing cubic-bezier(0.35, 0.7, 0.3, 1) — the knock sound plays then.
+ */
+const LAND_AT = 0.46
 
 type GameTableProps = {
   sessionPlayers: SessionPlayer[]
@@ -289,7 +294,7 @@ export default function GameTable({
         )
       )
     }
-    feedbackRoundStart(i, FLY_STAGGER, FLY_MS)
+    feedbackRoundStart(Array.from({ length: i }, (_, k) => (k * FLY_STAGGER + FLY_MS * LAND_AT) / 1000))
     Promise.all(anims.map(a => a.finished))
       .catch(() => {})
       .finally(() => doneRef.current?.())

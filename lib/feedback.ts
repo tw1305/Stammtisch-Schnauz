@@ -513,30 +513,23 @@ export function feedbackRevive() {
 }
 
 /**
- * Round start: every player flies to their seat at the table — a whoosh per
- * player (staggered like the animation), a wooden knock as each one lands, then
- * the dealer shuffles: a short card riffle.
+ * Round start: a wooden knock each time a player's token lands on its seat
+ * (low thump + short click). `landings` = seconds from now, one per player.
  */
-export function feedbackRoundStart(count: number, staggerMs: number, flightMs: number) {
-  vib([25, Math.round(flightMs * 0.9), 40]) // lift-off, then the landing
+export function feedbackRoundStart(landings: number[]) {
+  if (landings.length === 0) return
+  // One short buzz per landing (Android)
+  const pattern: number[] = [Math.round(landings[0] * 1000)]
+  landings.forEach((t, i) => {
+    if (i > 0) pattern.push(Math.max(10, Math.round((t - landings[i - 1]) * 1000) - 30))
+    pattern.push(30)
+  })
+  vib([0, ...pattern])
   if (!soundEnabled()) return
-  const stagger = staggerMs / 1000
-  const flight = flightMs / 1000
-  for (let i = 0; i < count; i++) {
-    const t = i * stagger
-    // Whoosh: filtered noise sweeping up while the token is in the air
-    hiss(t, flight * 0.8, { type: 'bandpass', from: rand(350, 450), to: rand(2200, 2800), gain: 0.55, q: 0.9 })
-    // Landing on the wooden table: low thump + short knock
-    const land = t + flight * 0.9
+  for (const land of landings) {
     tone(rand(150, 175), land, 0.13, { type: 'sine', to: 70, gain: 0.34 })
     hiss(land, 0.045, { type: 'bandpass', from: rand(900, 1300), gain: 0.22, q: 2.5 })
   }
-  // Card riffle once everyone sits: a quick run of tiny paper clicks, then the snap
-  const riffle = (count - 1) * stagger + flight + 0.12
-  for (let k = 0; k < 16; k++) {
-    hiss(riffle + k * 0.021 + rand(0, 0.006), 0.016, { type: 'highpass', from: rand(2500, 4500), gain: rand(0.28, 0.45) })
-  }
-  hiss(riffle + 16 * 0.021 + 0.05, 0.05, { type: 'bandpass', from: 1600, gain: 0.25, q: 1.5 })
 }
 
 /** Feuer (three aces): fire explosion recording. */

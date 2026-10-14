@@ -29,7 +29,7 @@ const SOUND_TESTS = [
   { label: '🔥 Feuer', play: feedbackFire },
   { label: '🪙 Sieg', play: () => feedbackWinner() },
   { label: '🩸 First Blood', play: () => feedbackWinner({ firstBlood: true }) },
-  { label: '🃏 Rundenstart', play: () => feedbackRoundStart(3, 70, 760) },
+  { label: '🃏 Rundenstart', play: () => feedbackRoundStart([0.35, 0.42, 0.49]) },
 ]
 
 const STAKE_KEY = 'schnauz_default_stake'
