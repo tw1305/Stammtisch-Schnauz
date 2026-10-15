@@ -23,7 +23,7 @@ type Props = {
   onUndo?: () => void
   /** Won the session's first round: blood oozes out behind the portrait. */
   firstBlood?: boolean
-  /** Won with a stake of 3 € or more: lightning storm, stronger with the stake (lib/effects stormFor). */
+  /** Won more than 10 €: lightning storm, stronger with the winnings (lib/effects stormFor). */
   storm?: StormLevel | null
   /** Milestones reached this round ("100. Sieg!"), winner's shown most prominently. */
   milestones?: PlayerMilestones[]

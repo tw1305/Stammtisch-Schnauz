@@ -10,7 +10,7 @@ import { NoobSign, NOOB_LEAVE_MS, Bandage, RainCloud, type NoobSignState } from 
 import { findMilestones, EMPTY_TOTALS, type PlayerMilestones } from '@/lib/milestones'
 import type { Player, RoundPlayer } from '@/types/database'
 
-type Preview = { stake: number; firstBlood: boolean; milestones: boolean; key: number }
+type Preview = { win: number; firstBlood: boolean; milestones: boolean; key: number }
 
 /**
  * Example milestones for the preview (worst case for the layout: lots of them):
@@ -52,18 +52,20 @@ export default function EffectPreview() {
     initFeedback()
   }, [])
 
-  // One button per storm level, plus First Blood alone (stake below the first level) and the full combo.
-  const top = STORM_LEVELS[STORM_LEVELS.length - 1].minStake
+  // One button per storm level (labelled with the winnings it starts at), plus
+  // First Blood alone (no lightning), the full combo and milestones.
+  const top = STORM_LEVELS[STORM_LEVELS.length - 1].minWin
+  const calm = STORM_LEVELS[0].minWin - 1
   const buttons = [
-    { label: '🩸 First Blood', stake: STORM_LEVELS[0].minStake - 1, firstBlood: true },
-    ...STORM_LEVELS.map((l, i) => ({ label: `${i >= 3 ? '⛈️' : '⚡'} ${l.minStake} €`, stake: l.minStake, firstBlood: false })),
-    { label: `🩸⛈️ ${top} €`, stake: top, firstBlood: true },
-    { label: '🏅 Meilenstein', stake: STORM_LEVELS[0].minStake - 1, firstBlood: false, milestones: true },
+    { label: '🩸 First Blood', win: calm, firstBlood: true },
+    ...STORM_LEVELS.map((l, i) => ({ label: `${i >= 3 ? '⛈️' : '⚡'} ${l.minWin} €`, win: l.minWin, firstBlood: false })),
+    { label: `🩸⛈️ ${top} €`, win: top, firstBlood: true },
+    { label: '🏅 Meilenstein', win: calm, firstBlood: false, milestones: true },
   ]
 
-  function open(stake: number, firstBlood: boolean, milestones = false) {
+  function open(win: number, firstBlood: boolean, milestones = false) {
     feedbackWinner({ firstBlood })
-    setPreview(p => ({ stake, firstBlood, milestones, key: (p?.key ?? 0) + 1 }))
+    setPreview(p => ({ win, firstBlood, milestones, key: (p?.key ?? 0) + 1 }))
   }
 
   function dropSign() {
@@ -85,7 +87,7 @@ export default function EffectPreview() {
         was_first_eliminated: i === players.length - 1,
         reached_final: i < 2,
         is_winner: i === 0,
-        balance_change: i === 0 ? preview.stake * (players.length - 1) : -preview.stake,
+        balance_change: i === 0 ? preview.win : -Math.round(preview.win / Math.max(1, players.length - 1)),
         revives_given: 0,
         player: p,
       }))
@@ -95,12 +97,12 @@ export default function EffectPreview() {
   return (
     <div className="px-4 pb-3.5 space-y-3">
       <div>
-        <p className="text-[#5E5544] text-[11px] font-medium mb-1.5">Siegerbildschirm-Effekte (Gewitter je Einsatz):</p>
+        <p className="text-[#5E5544] text-[11px] font-medium mb-1.5">Siegerbildschirm-Effekte (Gewitter ab Gewinnsumme):</p>
         <div className="grid grid-cols-4 gap-1.5">
           {buttons.map(b => (
             <button
               key={b.label}
-              onClick={() => open(b.stake, b.firstBlood, 'milestones' in b && b.milestones)}
+              onClick={() => open(b.win, b.firstBlood, 'milestones' in b && b.milestones)}
               disabled={players.length < 2}
               className="bg-[#FFFDF7] border border-[#E4D9BF] rounded-xl py-2 text-[11px] font-medium text-[#23201A] active:bg-[#E4D9BF] disabled:opacity-40"
             >
@@ -147,7 +149,7 @@ export default function EffectPreview() {
           onEndSession={() => setPreview(null)}
           onUndo={() => setPreview(null)}
           firstBlood={preview.firstBlood}
-          storm={stormFor(preview.stake)}
+          storm={stormFor(preview.win)}
           milestones={preview.milestones ? demoMilestones(players) : []}
         />
       )}

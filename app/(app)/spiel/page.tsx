@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useSession } from '@/hooks/useSession'
 import { useSessionMarks } from '@/hooks/useSessionMarks'
 import { applyRound, findMilestones, EMPTY_TOTALS, type PlayerMilestones } from '@/lib/milestones'
-import { stormFor } from '@/lib/effects'
+import { stormFor, possibleWin } from '@/lib/effects'
 import GameTable, { measureTokens, type TokenSpots } from '@/components/ui/GameTable'
 import { NAV_HEIGHT } from '@/components/ui/BottomNav'
 import { TEST_BANNER_HEIGHT, useTestMode } from '@/components/ui/TestModeBanner'
@@ -476,6 +476,7 @@ export default function SpielPage() {
             rainClouds={rainClouds}
             flyFrom={flyFrom}
             onFlyDone={() => setFlyFrom(null)}
+            pot={possibleWin(activeRound.stake, activeRound.player_count)}
           />
         </div>
 
@@ -666,7 +667,7 @@ export default function SpielPage() {
           onEndSession={handleEndSessionFromResult}
           firstBlood={completedRound.firstBlood}
           milestones={roundMilestones}
-          storm={stormFor(completedRound.round.stake)}
+          storm={stormFor(possibleWin(completedRound.round.stake, completedRound.round.player_count))}
         />
       )}
 

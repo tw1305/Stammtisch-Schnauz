@@ -9,6 +9,7 @@ import {
   rainCloudIds,
   DRY_SPELL_MIN,
   stormFor,
+  possibleWin,
   softenStorm,
   STORM_LEVELS,
   type NoobRound,
@@ -112,41 +113,48 @@ test('Noob signs: a new session (no rounds) starts clean', () => {
   assert.deepEqual(noobSigns([], false), { shown: [], entering: [], leaving: [] })
 })
 
-// ---------- Stake → storm ----------
+// ---------- Possible winnings → storm ----------
 
-test('Storm: nothing below 3 €', () => {
-  assert.equal(stormFor(0), null)
-  assert.equal(stormFor(2), null)
+test('Possible winnings: stake × players − own stake', () => {
+  assert.equal(possibleWin(3, 3), 6)
+  assert.equal(possibleWin(6, 4), 18)
+  assert.equal(possibleWin(21, 9), 168)
 })
 
-test('Storm: one level per stake step 3, 6, 9, 12, 15, 18 €', () => {
-  const steps = [3, 6, 9, 12, 15, 18]
-  assert.equal(STORM_LEVELS.length, steps.length)
-  steps.forEach((stake, i) => assert.equal(stormFor(stake), STORM_LEVELS[i]))
-  // stakes in between keep the level below, above 18 € stays at the top
-  assert.equal(stormFor(5), STORM_LEVELS[0])
-  assert.equal(stormFor(14), STORM_LEVELS[3])
-  assert.equal(stormFor(21), STORM_LEVELS[5])
-  assert.equal(stormFor(100), STORM_LEVELS[5])
+test('Storm: no lightning up to 10 € winnings', () => {
+  assert.equal(stormFor(0), null)
+  assert.equal(stormFor(6), null)
+  assert.equal(stormFor(10), null)
+})
+
+test('Storm: one level per 10 € of winnings, full storm from 60 €', () => {
+  const ranges: [number, number][] = [[11, 20], [21, 30], [31, 40], [41, 50], [51, 59]]
+  assert.equal(STORM_LEVELS.length, ranges.length + 1)
+  ranges.forEach(([lo, hi], i) => {
+    assert.equal(stormFor(lo), STORM_LEVELS[i], `${lo} €`)
+    assert.equal(stormFor(hi), STORM_LEVELS[i], `${hi} €`)
+  })
+  assert.equal(stormFor(60), STORM_LEVELS[5])
+  assert.equal(stormFor(168), STORM_LEVELS[5])
 })
 
 test('Storm: every level is stronger than the one before', () => {
   for (let i = 1; i < STORM_LEVELS.length; i++) {
     const [a, b] = [STORM_LEVELS[i - 1], STORM_LEVELS[i]]
-    assert.ok(b.minStake > a.minStake)
+    assert.ok(b.minWin > a.minWin)
     assert.ok(b.bolts > a.bolts && b.darken > a.darken && b.flash > a.flash && b.durationMs > a.durationMs)
     assert.ok(b.rain >= a.rain)
   }
 })
 
 test('Storm: only the top level shakes, and only gently', () => {
-  const top = stormFor(18)!
+  const top = stormFor(60)!
   assert.ok(top.shake > 0 && top.shake <= 4)
   assert.ok(STORM_LEVELS.slice(0, -1).every(l => l.shake === 0))
 })
 
 test('Storm: reduced motion keeps the effect but drops shake and flicker', () => {
-  const soft = softenStorm(stormFor(18)!)
+  const soft = softenStorm(stormFor(60)!)
   assert.equal(soft.shake, 0)
   assert.equal(soft.flicker, false)
   assert.ok(soft.flash <= 0.2 && soft.bolts >= 1)

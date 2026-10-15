@@ -21,6 +21,9 @@ export function measureTokens(root: HTMLElement | null): TokenSpots {
   return { at: Date.now(), spots }
 }
 
+/** Where the winnings counter sits: front middle of the wooden table, in % of the scene image. */
+const POT_COUNTER = { left: 50.5, top: 61.5 }
+
 /** Round-start flight: per-token stagger and flight time (ms). */
 const FLY_STAGGER = 70
 const FLY_MS = 760
@@ -45,6 +48,8 @@ type GameTableProps = {
   noobSigns?: Map<string, NoobSignState>
   /** Rain clouds above portraits (losing streak in the session). */
   rainClouds?: Set<string>
+  /** Running round: possible winnings, shown on a small counter on the table. */
+  pot?: number
   /** Round just started: tokens fly in from these spots (measured on the setup table). */
   flyFrom?: TokenSpots | null
   onFlyDone?: () => void
@@ -177,6 +182,7 @@ export default function GameTable({
   noobSigns,
   rainClouds,
   flyFrom = null,
+  pot,
   onFlyDone,
 }: GameTableProps) {
   const boxRef = useRef<HTMLDivElement>(null)
@@ -385,6 +391,34 @@ export default function GameTable({
           <span className="text-[10px] mt-0.5 px-4 leading-tight text-[#B0A084]">
             Runde noch nicht gestartet
           </span>
+        </div>
+      )}
+
+      {/* Possible winnings: a small brass counter on the front of the wooden table (never tappable, under the tokens) */}
+      {layout && pot != null && (
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+          style={{
+            left: layout.img.left + (POT_COUNTER.left / 100) * layout.img.w,
+            top: layout.img.top + (POT_COUNTER.top / 100) * layout.img.h,
+          }}
+          aria-label={`Mögliche Gewinnsumme: ${pot} €`}
+          role="status"
+        >
+          {/* zoom on the inner box only: on the positioned box it would scale left/top as well */}
+          <div
+            className="flex flex-col items-center rounded-xl px-2.5 py-1 leading-none"
+            style={{
+              zoom: tokenScale,
+              background: 'linear-gradient(180deg, rgba(58,38,18,0.9), rgba(34,22,10,0.9))',
+              boxShadow: '0 0 0 1.5px #C9A045, 0 3px 8px rgba(0,0,0,0.45)',
+            }}
+          >
+            <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-[#D9C08A]">Gewinn</span>
+            <span className="text-[15px] font-extrabold tabular-nums text-[#FFE08A] mt-0.5" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>
+              {pot} €
+            </span>
+          </div>
         </div>
       )}
 

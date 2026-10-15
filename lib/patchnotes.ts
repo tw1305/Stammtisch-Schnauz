@@ -18,7 +18,7 @@ export type PatchNote = {
 export const PATCH_NOTES: PatchNote[] = [
   {
     version: '2.0.0',
-    date: '2026-10-14',
+    date: '2026-10-15',
     title: 'Feuer und Flamme (Season 4 Update)',
     changes: [
       { type: 'neu', text: 'Season-Rückblick ✨: Zum Abschluss einer Season erscheint eine Story mit den Highlights – Podium, rote Laterne, bester und härtester Abend, Achterbahn (der tiefe Fall vom höchsten Plus ins Minus und das größte Comeback aus dem Minus, mit eingezeichnetem Saldo-Verlauf), Hot Streak, Feuer-König, Erster raus, das Finale (Dauergast im Finale und Finalkönig), Notaufnahme, teuerste Runde und Stammgäste – bildschirmfüllend auf jedem Handy. Unter „Und jetzt du“ wählt jeder sich selbst aus und sieht seine Season samt Erzfeind (gegen wen man die meisten Finals verloren hat) und Lieblingsgegner (gegen wen man die meisten Finals gewonnen hat). Dazu läuft „I Get Money“ von 50 Cent in voller Länge. Oben rechts lässt sich die Story pausieren und die Musik stummschalten. Zum Schluss der Endstand zum Teilen. Jederzeit nochmal über die Season-Übersicht abrufbar (ab Season 3).' },
@@ -26,7 +26,8 @@ export const PATCH_NOTES: PatchNote[] = [
       { type: 'neu', text: 'Siegesserien sichtbar am Profilbild – über Sessions und Seasons hinweg: nach einem Sieg ein goldener schimmernder Ring, nach zwei Siegen in Folge glüht er rot und erste Flammen und Funken züngeln, ab drei Siegen brennt ein Ring aus echtem Feuer („On Fire“).' },
       { type: 'neu', text: 'Rundenende: Der Sieger erscheint groß in der Bildschirmmitte, bekommt Ring oder Flamme per Animation und fliegt dann in die (jetzt größere) Rundenübersicht.' },
       { type: 'neu', text: 'First Blood 🩸: Wer die erste Runde einer Session gewinnt, bekommt im Siegerbildschirm eine Blutlache, die hinter dem Profilbild hervorquillt und langsam heruntertropft – und vor dem Siegessong ertönt der „First Blood“-Ruf aus Counter-Strike; der Song setzt nahtlos ein, während der Ruf ausklingt.' },
-      { type: 'neu', text: 'Unwetter ⚡: Beim Rundensieg blitzt es im Siegerbildschirm – mit jeder Einsatzstufe heftiger: ein Blitz bei 3 €, zwei bei 6 €, drei bei 9 €, ab 12 € dunkler Himmel, Sturmwolken und flackernde Blitze, bei 15 € Regen und Blitz auf Blitz, ab 18 € ein ausgewachsenes Gewitter mit Platzregen und wackelndem Bildschirm.' },
+      { type: 'neu', text: 'Unwetter ⚡: Beim Rundensieg blitzt es im Siegerbildschirm – je höher die Gewinnsumme (Einsatz × Spieler − eigener Einsatz), desto heftiger: bis 10 € bleibt es ruhig, ab 11 € ein Blitz, dann mit jeden weiteren 10 € mehr Blitze, dunklerer Himmel, Sturmwolken und Regen, ab 60 € ein ausgewachsenes Gewitter mit Platzregen und wackelndem Bildschirm.' },
+      { type: 'neu', text: 'Gewinn-Zähler 💰: Auf dem Holztisch steht während der Runde ein kleines Schild mit der möglichen Gewinnsumme.' },
       { type: 'neu', text: 'Rundenstart 🃏: Beim Start einer Runde fliegen alle Spieler samt Saldo vom Vorbereitungstisch an ihre Plätze am Holztisch – jeder landet mit einem Holz-Klopfen auf seinem Platz.' },
       { type: 'neu', text: 'Finale-Duell ⚔️: Sind nur noch zwei Spieler übrig, dunkelt der Tisch ab, Spotlights fallen auf die beiden Finalisten, ein Blitz knistert zwischen ihnen und ein „VS“ erscheint.' },
       { type: 'neu', text: 'Pflaster 🩹 und Regenwolke 🌧️: Wer wiederbelebt wurde, trägt für den Rest der Runde gekreuzte Pflaster am Profilbild. Wer in einer Session vier Runden in Folge nicht gewinnt, bekommt eine kleine Regenwolke über den Kopf – bis zum nächsten Sieg.' },

@@ -116,11 +116,16 @@ export function rainCloudIds(rounds: NoobRound[]): Set<string> {
   return ids
 }
 
-// ---------- Storm (round won with a stake of 3 € or more) ----------
+// ---------- Storm (round won with more than 10 € at stake) ----------
+
+/** Possible winnings of a round: what the winner gains = stake × players − their own stake. */
+export function possibleWin(stake: number, playerCount: number): number {
+  return stake * playerCount - stake
+}
 
 export type StormLevel = {
-  /** Applies from this stake (€) upwards. */
-  minStake: number
+  /** Applies from these winnings (€, inclusive) upwards. */
+  minWin: number
   /** Lightning strikes over the whole storm. */
   bolts: number
   /** How long strikes keep coming (ms); the first one hits right away. */
@@ -140,24 +145,24 @@ export type StormLevel = {
 }
 
 /**
- * Stake → storm intensity: one level per stake step (3, 6, 9, 12, 15, 18 €).
- * Stakes in between get the level below, everything above 18 € the top level.
- * Edit here to retune.
+ * Possible winnings → storm intensity. Up to 10 € no lightning, then one level
+ * per 10 €: 11–20, 21–30, 31–40, 41–50, 51–59 €, and from 60 € the full
+ * thunderstorm. Edit here to retune.
  */
 export const STORM_LEVELS: StormLevel[] = [
-  { minStake: 3, bolts: 1, durationMs: 600, darken: 0.15, flash: 0.22, flicker: false, rain: 0, shake: 0, clouds: false },
-  { minStake: 6, bolts: 2, durationMs: 1600, darken: 0.25, flash: 0.3, flicker: false, rain: 0, shake: 0, clouds: false },
-  { minStake: 9, bolts: 3, durationMs: 2600, darken: 0.38, flash: 0.36, flicker: false, rain: 0, shake: 0, clouds: false },
-  { minStake: 12, bolts: 5, durationMs: 4000, darken: 0.52, flash: 0.42, flicker: true, rain: 30, shake: 0, clouds: true },
-  { minStake: 15, bolts: 9, durationMs: 6000, darken: 0.68, flash: 0.48, flicker: true, rain: 75, shake: 0, clouds: true },
+  { minWin: 11, bolts: 1, durationMs: 600, darken: 0.15, flash: 0.22, flicker: false, rain: 0, shake: 0, clouds: false },
+  { minWin: 21, bolts: 2, durationMs: 1600, darken: 0.25, flash: 0.3, flicker: false, rain: 0, shake: 0, clouds: false },
+  { minWin: 31, bolts: 3, durationMs: 2600, darken: 0.38, flash: 0.36, flicker: false, rain: 0, shake: 0, clouds: false },
+  { minWin: 41, bolts: 5, durationMs: 4000, darken: 0.52, flash: 0.42, flicker: true, rain: 30, shake: 0, clouds: true },
+  { minWin: 51, bolts: 9, durationMs: 6000, darken: 0.68, flash: 0.48, flicker: true, rain: 75, shake: 0, clouds: true },
   // full thunderstorm; the shake stays gentle so the card remains readable
-  { minStake: 18, bolts: 18, durationMs: 8000, darken: 0.82, flash: 0.55, flicker: true, rain: 130, shake: 3.5, clouds: true },
+  { minWin: 60, bolts: 18, durationMs: 8000, darken: 0.82, flash: 0.55, flicker: true, rain: 130, shake: 3.5, clouds: true },
 ]
 
-/** Storm for a won round's stake, or null below the first level (unchanged result screen). */
-export function stormFor(stake: number): StormLevel | null {
+/** Storm for a round's possible winnings, or null up to 10 € (unchanged result screen). */
+export function stormFor(win: number): StormLevel | null {
   let level: StormLevel | null = null
-  for (const l of STORM_LEVELS) if (stake >= l.minStake) level = l
+  for (const l of STORM_LEVELS) if (win >= l.minWin) level = l
   return level
 }
 
